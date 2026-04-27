@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { AdminCircleRow } from "@/server/services/admin.service";
 import { CircleStatusBadge } from "@/components/ui/CircleStatusBadge";
 import { Button } from "@/components/ui/Button";
+import { CopyableText } from "@/components/ui/CopyableText";
 import { format } from "date-fns";
 import styles from "../admin.module.css";
 
@@ -14,7 +15,7 @@ interface CirclesTableProps {
 export function CirclesTable({ circles }: CirclesTableProps) {
   const [payingOut, setPayingOut] = useState<string | null>(null);
   const [payoutError, setPayoutError] = useState<string | null>(null);
-  const [payoutSuccess, setPayoutSuccess] = useState<string | null>(null);
+  const [payoutSuccess, setPayoutSuccess] = useState<{ message: string; txHash: string } | null>(null);
 
   const handleManualPayout = async (circleId: string) => {
     setPayingOut(circleId);
@@ -27,7 +28,10 @@ export function CirclesTable({ circles }: CirclesTableProps) {
 
       if (!json.success) throw new Error(json.error);
 
-      setPayoutSuccess(`Payout triggered. TX: ${json.data.txHash.slice(0, 16)}…`);
+      setPayoutSuccess({
+        message: "Payout triggered successfully",
+        txHash: json.data.txHash,
+      });
       setTimeout(() => setPayoutSuccess(null), 5000);
     } catch (err) {
       setPayoutError(err instanceof Error ? err.message : "Payout failed");
@@ -45,7 +49,12 @@ export function CirclesTable({ circles }: CirclesTableProps) {
       {payoutError && <div className={styles.error}>{payoutError}</div>}
       {payoutSuccess && (
         <div style={{ background: "rgba(34, 197, 94, 0.1)", border: "1px solid var(--color-success)", borderRadius: "var(--radius-md)", padding: "var(--space-4) var(--space-6)", color: "var(--color-success)", marginBottom: "var(--space-6)" }}>
-          {payoutSuccess}
+          {payoutSuccess.message} — TX:{" "}
+          <CopyableText
+            text={payoutSuccess.txHash}
+            displayText={`${payoutSuccess.txHash.slice(0, 16)}…`}
+            label="Copy transaction hash"
+          />
         </div>
       )}
 

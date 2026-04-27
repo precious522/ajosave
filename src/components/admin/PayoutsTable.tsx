@@ -2,6 +2,7 @@
 
 import type { AdminPayoutRow } from "@/server/services/admin.service";
 import { format } from "date-fns";
+import { CopyableText } from "@/components/ui/CopyableText";
 import styles from "../admin.module.css";
 
 interface PayoutsTableProps {
@@ -30,7 +31,13 @@ export function PayoutsTable({ payouts }: PayoutsTableProps) {
           {payouts.map((payout) => (
             <tr key={payout.id}>
               <td>{payout.circleName}</td>
-              <td className={styles.monospace}>{payout.recipientUserId.slice(0, 12)}…</td>
+              <td className={styles.monospace}>
+                <CopyableText
+                  text={payout.recipientUserId}
+                  displayText={`${payout.recipientUserId.slice(0, 12)}…`}
+                  label="Copy user ID"
+                />
+              </td>
               <td>#{payout.cycleNumber}</td>
               <td>{parseFloat(payout.amountUsdc).toFixed(2)}</td>
               <td>
@@ -41,7 +48,11 @@ export function PayoutsTable({ payouts }: PayoutsTableProps) {
                   className={styles.monospace}
                   style={{ color: "var(--color-brand-primary)", textDecoration: "underline" }}
                 >
-                  {payout.txHash.slice(0, 16)}…
+                  <CopyableText
+                    text={payout.txHash}
+                    displayText={`${payout.txHash.slice(0, 16)}…`}
+                    label="Copy transaction hash"
+                  />
                 </a>
               </td>
               <td>{format(new Date(payout.paidAt), "MMM d, yyyy HH:mm")}</td>

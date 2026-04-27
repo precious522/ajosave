@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Circle, Member } from "@/types";
 import { Button } from "@/components/ui/Button";
+import { CopyableText } from "@/components/ui/CopyableText";
 import styles from "./MemberPayoutList.module.css";
 
 interface Props {
@@ -67,7 +68,11 @@ export function MemberPayoutList({ circle, initialMembers, isCreator }: Props) {
                 </span>
 
                 <span className={styles.memberId}>
-                  Member {m.userId.slice(0, 8)}…
+                  <CopyableText
+                    text={m.userId}
+                    displayText={`Member ${m.userId.slice(0, 8)}…`}
+                    label="Copy member ID"
+                  />
                 </span>
 
                 <span className={styles.statusTag}>
