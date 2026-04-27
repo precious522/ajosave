@@ -13,7 +13,7 @@ const cspHeader = [
   // Fonts: self
   "font-src 'self'",
   // API / WebSocket connections restricted to known endpoints
-  "connect-src 'self' https://horizon.stellar.org https://horizon-testnet.stellar.org https://api.paystack.co https://api.ng.termii.com",
+  "connect-src 'self' https://horizon.stellar.org https://horizon-testnet.stellar.org https://api.paystack.co https://api.ng.termii.com https://*.ingest.sentry.io",
   // No plugins
   "object-src 'none'",
   // Framing: deny
