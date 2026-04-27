@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getCircleById, getMembersByCircle } from "@/server/services/circle.service";
+import { getCircleById, shuffleAndPersistPositions } from "@/server/services/circle.service";
 import { withErrorHandler } from "@/server/middleware";
 import type { ApiResponse, Member } from "@/types";
+import { randomBytes } from "crypto";
 
 /**
  * POST /api/circles/[id]/shuffle
  * Randomizes payout positions for an open circle (creator only).
- * In production this would persist to DB; here we return the shuffled order.
+ * Generates a seed, persists shuffled positions to DB, and stores seed for verifiability.
  */
 export const POST = withErrorHandler(async (_req: NextRequest, ctx: unknown) => {
   const session = await getServerSession(authOptions);
@@ -43,16 +44,17 @@ export const POST = withErrorHandler(async (_req: NextRequest, ctx: unknown) => 
     );
   }
 
-  const circleMembers = await getMembersByCircle(params.id);
-  // Fisher-Yates shuffle on positions
-  const positions = circleMembers.map((_, i) => i + 1);
-  for (let i = positions.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [positions[i], positions[j]] = [positions[j], positions[i]];
+  // Generate deterministic seed from current timestamp and random bytes
+  const seed = `${Date.now()}-${randomBytes(16).toString("hex")}`;
+
+  try {
+    const shuffled = await shuffleAndPersistPositions(params.id, seed);
+    return NextResponse.json<ApiResponse<Member[]>>({ success: true, data: shuffled });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to shuffle positions";
+    return NextResponse.json<ApiResponse<never>>(
+      { success: false, error: message },
+      { status: 400 }
+    );
   }
-
-  const shuffled: Member[] = circleMembers.map((m, i) => ({ ...m, position: positions[i] }));
-  shuffled.sort((a, b) => a.position - b.position);
-
-  return NextResponse.json<ApiResponse<Member[]>>({ success: true, data: shuffled });
 });

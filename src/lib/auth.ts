@@ -19,7 +19,7 @@ export const authOptions: NextAuthOptions = {
         const parsed = verifyOtpSchema.safeParse(credentials);
         if (!parsed.success) return null;
         // TODO: verify OTP from Redis and load user from DB
-        return { id: "placeholder-id", phone: parsed.data.phone, name: "Ajosave User" };
+        return { id: "placeholder-id", phone: parsed.data.phone, name: "Ajosave User", role: "user" };
       },
     }),
   ],
@@ -31,6 +31,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.phone = (user as { phone?: string }).phone;
+        token.role = (user as { role?: string }).role ?? "user";
         token.accessTokenExpires = now + ACCESS_TOKEN_TTL;
         token.refreshTokenExpires = now + REFRESH_TOKEN_TTL;
         return token;
@@ -57,6 +58,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as { id?: string }).id = token.id as string;
         (session.user as { phone?: string }).phone = token.phone as string;
+        (session.user as { role?: string }).role = token.role as string;
       }
       (session as { accessTokenExpires?: number }).accessTokenExpires =
         token.accessTokenExpires as number;

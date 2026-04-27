@@ -11,6 +11,7 @@ export const createCircleSchema = z.object({
   }),
   maxMembers: z.number().min(2, "Minimum 2 members").max(20, "Maximum 20 members"),
   cycleFrequency: z.enum(["weekly", "biweekly", "monthly"]),
+  payoutMethod: z.enum(["fixed", "randomized"]).default("fixed"),
 });
 
 export const joinCircleSchema = z.object({

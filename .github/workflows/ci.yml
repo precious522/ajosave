@@ -31,9 +31,16 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: npm }
       - run: npm ci
-      - run: npm test -- --coverage
-      - uses: codecov/codecov-action@v4
-        with: { token: "${{ secrets.CODECOV_TOKEN }}", fail_ci_if_error: false }
+      - name: Run tests with coverage
+        run: npm run test:coverage -- --ci
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          flags: unittests
+          fail_ci_if_error: false
+          verbose: true
 
   build:
     name: Next.js Build
@@ -94,6 +101,51 @@ jobs:
       - name: Run migrations down
         run: npm run migrate:down
 
+  e2e:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: [build]
+    env:
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_NAME: Ajosave
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ci-secret-placeholder
+      DATABASE_URL: postgresql://user:password@localhost:5432/ajosave
+      STELLAR_NETWORK: testnet
+      STELLAR_HORIZON_URL: https://horizon-testnet.stellar.org
+      STELLAR_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
+      STELLAR_SERVER_SECRET_KEY: SXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      USDC_ISSUER: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+      USDC_ASSET_CODE: USDC
+      PAYSTACK_SECRET_KEY: sk_test_placeholder
+      TERMII_API_KEY: placeholder
+      REDIS_URL: redis://localhost:6379
+      CRON_SECRET: placeholder
+      NEXT_PUBLIC_SENTRY_DSN: ""
+      SENTRY_DSN: ""
+      SENTRY_ORG: ajosave
+      SENTRY_PROJECT: ajosave-nextjs
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Build Next.js
+        run: npm run build
+      - name: Run E2E tests
+        run: npx playwright test --reporter=github
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ vars.STAGING_URL || 'http://localhost:3000' }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
   contract-test:
     name: Soroban Contract Tests
     runs-on: ubuntu-latest
@@ -103,9 +155,12 @@ jobs:
         with: { targets: wasm32-unknown-unknown }
       - uses: Swatinem/rust-cache@v2
         with: { workspaces: contracts }
-      - name: Run contract tests
+      - name: Run contract unit tests
         working-directory: contracts
-        run: cargo test
+        run: cargo test --lib
+      - name: Run Soroban integration tests
+        working-directory: contracts
+        run: cargo test integration_tests
 
   deploy-contract-testnet:
     name: Deploy Contract to Testnet

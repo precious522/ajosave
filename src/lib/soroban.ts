@@ -31,3 +31,34 @@ export async function invokeContractPayout(contractId: string): Promise<string> 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (sent as any).hash ?? (sent as any).sendTransactionResponse?.hash ?? "";
 }
+
+/**
+ * Invoke AjoContract.set_payout_order() via Soroban RPC.
+ * Sets the randomized payout order on the smart contract.
+ *
+ * @param contractId - The deployed Ajo contract address for this circle
+ * @param payoutOrder - Array of member indices in desired payout order
+ * @returns The Soroban transaction hash
+ */
+export async function invokeContractSetPayoutOrder(
+  contractId: string,
+  payoutOrder: number[]
+): Promise<string> {
+  const keypair = Keypair.fromSecret(serverConfig.stellar.serverSecretKey);
+  const signer = contract.basicNodeSigner(keypair, networkPassphrase);
+
+  const client = await contract.Client.from({
+    contractId,
+    networkPassphrase,
+    rpcUrl: serverConfig.stellar.sorobanRpcUrl,
+    publicKey: keypair.publicKey(),
+    ...signer,
+  });
+
+  // set_payout_order(order: Vec<u32>)
+  // @ts-expect-error — method generated from contract ABI at runtime
+  const assembled = await client.set_payout_order({ order: payoutOrder });
+  const sent = await assembled.send();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (sent as any).hash ?? (sent as any).sendTransactionResponse?.hash ?? "";
+}

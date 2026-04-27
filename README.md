@@ -4,6 +4,7 @@
 > The traditional West African savings group — now with smart contracts, no middleman, automatic payouts.
 
 [![CI](https://github.com/JosephOnuh/ajosave/actions/workflows/ci.yml/badge.svg)](https://github.com/JosephOnuh/ajosave/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/JosephOnuh/ajosave/branch/main/graph/badge.svg)](https://codecov.io/gh/JosephOnuh/ajosave)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Built on Stellar](https://img.shields.io/badge/Built%20on-Stellar-blue)](https://stellar.org)
 [![Soroban](https://img.shields.io/badge/Smart%20Contracts-Soroban-blueviolet)](https://developers.stellar.org/docs/build/smart-contracts)
