@@ -1,22 +1,50 @@
 import { processCyclePayout, getPayoutsByCircle } from "@/server/services/payout.service";
 import * as circleService from "@/server/services/circle.service";
-import * as stellar from "@/lib/stellar";
 import * as db from "@/lib/db";
 import type { Circle, Member, Payout } from "@/types";
 
 jest.mock("@/server/services/circle.service");
-jest.mock("@/lib/stellar");
 jest.mock("@/lib/db");
 
 const mockGetCircleById = circleService.getCircleById as jest.MockedFunction<typeof circleService.getCircleById>;
 const mockGetMembersByCircle = circleService.getMembersByCircle as jest.MockedFunction<typeof circleService.getMembersByCircle>;
 const mockUpdateCircleStatus = circleService.updateCircleStatus as jest.MockedFunction<typeof circleService.updateCircleStatus>;
-const mockSendUsdcPayment = stellar.sendUsdcPayment as jest.MockedFunction<typeof stellar.sendUsdcPayment>;
 const mockQuery = db.query as jest.MockedFunction<typeof db.query>;
 
+// Mock horizonServer.loadAccount and USDC for validation tests
+const mockLoadAccount = jest.fn();
+const mockSendUsdcPayment = jest.fn();
+
+jest.mock("@/lib/stellar", () => ({
+  sendUsdcPayment: (...args: unknown[]) => mockSendUsdcPayment(...args),
+  horizonServer: { loadAccount: (...args: unknown[]) => mockLoadAccount(...args) },
+  USDC: { getCode: () => "USDC", getIssuer: () => "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5" },
+}));
+
+jest.mock("@/lib/soroban", () => ({
+  invokeContractPayout: jest.fn().mockResolvedValue("soroban-tx-hash"),
+}));
+
+jest.mock("@/server/services/notification.service", () => ({
+  notifyPayoutProcessed: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/server/services/payout-lock", () => ({
+  withPayoutLock: jest.fn((_id: string, fn: () => unknown) => fn()),
+  PayoutLockError: class PayoutLockError extends Error {},
+}));
+
 const CIRCLE_ID = "circle-1";
-const RECIPIENT_KEY = "GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+// Valid Stellar Ed25519 public key
+const RECIPIENT_KEY = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN";
 const TX_HASH = "abc123txhash";
+
+const USDC_BALANCE = {
+  asset_type: "credit_alphanum4",
+  asset_code: "USDC",
+  asset_issuer: "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+  balance: "100.0000000",
+};
 
 function makeCircle(overrides: Partial<Circle> = {}): Circle {
   return {
@@ -27,6 +55,7 @@ function makeCircle(overrides: Partial<Circle> = {}): Circle {
     contributionNgn: 16000,
     maxMembers: 3,
     cycleFrequency: "monthly",
+    payoutMethod: "fixed",
     status: "active",
     currentCycle: 1,
     createdAt: new Date(),
@@ -41,7 +70,7 @@ function makeMembers(count: number): Member[] {
     circleId: CIRCLE_ID,
     userId: `user-${i + 1}`,
     position: i + 1,
-    status: "active",
+    status: "active" as const,
     hasReceivedPayout: false,
     joinedAt: new Date(),
   }));
@@ -64,6 +93,10 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockUpdateCircleStatus.mockResolvedValue(undefined);
   mockSendUsdcPayment.mockResolvedValue(TX_HASH);
+  // Default: account exists with USDC trustline
+  mockLoadAccount.mockResolvedValue({ balances: [USDC_BALANCE] });
+  // Default: user query for notifications
+  mockQuery.mockResolvedValue({ rows: [], rowCount: 0 } as any);
 });
 
 describe("processCyclePayout", () => {
@@ -118,7 +151,6 @@ describe("processCyclePayout", () => {
       const payout = await processCyclePayout(CIRCLE_ID, RECIPIENT_KEY);
 
       expect(payout).toEqual(payoutRecord);
-      // Verify query was called to insert payout
       expect(mockQuery).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO payouts"),
         expect.any(Array)
@@ -136,6 +168,52 @@ describe("processCyclePayout", () => {
         expect.stringContaining("SELECT id, circle_id"),
         [CIRCLE_ID]
       );
+    });
+  });
+
+  describe("Stellar key validation", () => {
+    it("throws on invalid key format", async () => {
+      mockGetCircleById.mockResolvedValue(makeCircle());
+      mockGetMembersByCircle.mockResolvedValue(makeMembers(2));
+
+      await expect(processCyclePayout(CIRCLE_ID, "not-a-stellar-key")).rejects.toThrow(
+        "Invalid Stellar public key"
+      );
+      expect(mockSendUsdcPayment).not.toHaveBeenCalled();
+    });
+
+    it("throws when account does not exist on-chain", async () => {
+      mockGetCircleById.mockResolvedValue(makeCircle());
+      mockGetMembersByCircle.mockResolvedValue(makeMembers(2));
+      mockLoadAccount.mockRejectedValue(new Error("Not Found"));
+
+      await expect(processCyclePayout(CIRCLE_ID, RECIPIENT_KEY)).rejects.toThrow(
+        "Stellar account not found on-chain"
+      );
+      expect(mockSendUsdcPayment).not.toHaveBeenCalled();
+    });
+
+    it("throws when account has no USDC trustline", async () => {
+      mockGetCircleById.mockResolvedValue(makeCircle());
+      mockGetMembersByCircle.mockResolvedValue(makeMembers(2));
+      mockLoadAccount.mockResolvedValue({ balances: [{ asset_type: "native", balance: "100" }] });
+
+      await expect(processCyclePayout(CIRCLE_ID, RECIPIENT_KEY)).rejects.toThrow(
+        "Recipient account has no USDC trustline"
+      );
+      expect(mockSendUsdcPayment).not.toHaveBeenCalled();
+    });
+
+    it("skips Horizon validation on Soroban path (contractId present)", async () => {
+      mockGetCircleById.mockResolvedValue(makeCircle({ contractId: "CTEST123" }));
+      mockGetMembersByCircle.mockResolvedValue(makeMembers(2));
+      mockQuery.mockResolvedValue({ rows: [makePayout()], rowCount: 1 } as any);
+
+      await processCyclePayout(CIRCLE_ID, RECIPIENT_KEY);
+
+      // loadAccount should NOT be called on the Soroban path
+      expect(mockLoadAccount).not.toHaveBeenCalled();
+      expect(mockSendUsdcPayment).not.toHaveBeenCalled();
     });
   });
 
