@@ -7,7 +7,23 @@ const config = {
   testEnvironment: "jest-environment-jsdom",
   moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
   testPathIgnorePatterns: ["<rootDir>/node_modules/", "<rootDir>/.next/"],
-  collectCoverageFrom: ["src/**/*.{ts,tsx}", "!src/**/*.d.ts"],
+  collectCoverageFrom: [
+    "src/**/*.{ts,tsx}",
+    "!src/**/*.d.ts",
+    "!src/**/*.module.css.d.ts",
+    "!src/app/layout.tsx",
+    "!src/app/error.tsx",
+    "!src/app/**/error.tsx",
+  ],
+  coverageReporters: ["text", "lcov", "json-summary"],
+  coverageThreshold: {
+    global: {
+      lines: 70,
+      functions: 70,
+      branches: 70,
+      statements: 70,
+    },
+  },
 };
 
 module.exports = createJestConfig(config);

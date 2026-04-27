@@ -1,0 +1,281 @@
+.container {
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.content {
+  max-width: 900px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 12px;
+  padding: 3rem 2rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.subtitle {
+  font-size: 1.125rem;
+  color: #718096;
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.section {
+  margin-bottom: 3rem;
+}
+
+.sectionTitle {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.guide {
+  margin-top: 1.5rem;
+}
+
+.intro {
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: #4a5568;
+  margin-bottom: 2rem;
+}
+
+.walletOptions {
+  display: grid;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.walletCard {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  background: #f7fafc;
+}
+
+.walletName {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.5rem;
+}
+
+.walletDesc {
+  font-size: 0.9375rem;
+  color: #718096;
+  margin-bottom: 1rem;
+}
+
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.steps li {
+  padding-left: 1.5rem;
+  margin-bottom: 0.5rem;
+  position: relative;
+  color: #4a5568;
+  line-height: 1.6;
+}
+
+.steps li::before {
+  content: "→";
+  position: absolute;
+  left: 0;
+  color: #667eea;
+  font-weight: bold;
+}
+
+.warning {
+  background: #fff5f5;
+  border-left: 4px solid #fc8181;
+  padding: 1rem 1.5rem;
+  border-radius: 4px;
+  margin-top: 2rem;
+}
+
+.warning strong {
+  color: #c53030;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.warning ul {
+  margin: 0.5rem 0 0 1.5rem;
+  color: #742a2a;
+}
+
+.warning li {
+  margin-bottom: 0.25rem;
+}
+
+.tip {
+  background: #f0fff4;
+  border-left: 4px solid #48bb78;
+  padding: 1rem 1.5rem;
+  border-radius: 4px;
+  margin-top: 1.5rem;
+  color: #22543d;
+}
+
+.tip strong {
+  color: #276749;
+}
+
+.stepsList {
+  list-style: none;
+  counter-reset: step-counter;
+  padding: 0;
+}
+
+.stepItem {
+  counter-increment: step-counter;
+  margin-bottom: 1.5rem;
+  padding-left: 3rem;
+  position: relative;
+  color: #4a5568;
+  line-height: 1.7;
+}
+
+.stepItem::before {
+  content: counter(step-counter);
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: #667eea;
+  color: white;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.comparisonTable {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tableRow:last-child {
+  border-bottom: none;
+}
+
+.tableHeader {
+  background: #667eea;
+  color: white;
+  padding: 1rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.tableCell {
+  padding: 1rem;
+  border-right: 1px solid #e2e8f0;
+  color: #4a5568;
+}
+
+.tableCell:last-child {
+  border-right: none;
+}
+
+.faqItem {
+  margin-bottom: 2rem;
+}
+
+.question {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.75rem;
+}
+
+.answer {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: #4a5568;
+}
+
+.contactBox {
+  background: #edf2f7;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+}
+
+.contactBox p {
+  font-size: 1.125rem;
+  color: #2d3748;
+  margin-bottom: 1rem;
+}
+
+.contactList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.contactList li {
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  color: #4a5568;
+}
+
+.link {
+  color: #667eea;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.link:hover {
+  color: #764ba2;
+}
+
+@media (max-width: 768px) {
+  .content {
+    padding: 2rem 1.5rem;
+  }
+
+  .title {
+    font-size: 2rem;
+  }
+
+  .sectionTitle {
+    font-size: 1.5rem;
+  }
+
+  .tableRow {
+    grid-template-columns: 1fr;
+  }
+
+  .tableCell {
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .tableCell:last-child {
+    border-bottom: none;
+  }
+}

@@ -3,6 +3,7 @@ import { sendUsdcPayment } from "@/lib/stellar";
 import { invokeContractPayout } from "@/lib/soroban";
 import { getCircleById, getMembersByCircle, updateCircleStatus } from "./circle.service";
 import { withPayoutLock, PayoutLockError } from "./payout-lock";
+import { notifyPayoutProcessed } from "./notification.service";
 import type { Payout } from "@/types";
 import { randomUUID } from "crypto";
 
@@ -42,7 +43,8 @@ export async function processCyclePayout(
     }
 
     const payoutId = randomUUID();
-    const recipientMemberId = circleMembers[circle.currentCycle - 1]?.id ?? "";
+    const recipientMember = circleMembers[circle.currentCycle - 1];
+    const recipientMemberId = recipientMember?.id ?? "";
 
     // Persist payout to PostgreSQL
     const { rows } = await query<Payout>(
@@ -54,6 +56,21 @@ export async function processCyclePayout(
     );
 
     const payout = rows[0];
+
+    // Send SMS notifications to all members
+    if (recipientMember) {
+      const memberUserIds = circleMembers.map(m => m.userId);
+      const { rows: recipientUser } = await query<{ display_name: string }>(
+        "SELECT display_name FROM users WHERE id = $1",
+        [recipientMember.userId]
+      );
+      const recipientName = recipientUser[0]?.display_name ?? "Member";
+      
+      // Notify all members about the payout (async, don't block)
+      notifyPayoutProcessed(memberUserIds, circle.name, totalPot, recipientName).catch(err => {
+        console.error("Failed to send payout notifications:", err);
+      });
+    }
 
     if (circle.currentCycle >= circleMembers.length) {
       await updateCircleStatus(circleId, "completed");

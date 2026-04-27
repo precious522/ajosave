@@ -25,6 +25,7 @@ pub enum DataKey {
     MaxMembers,
     CycleIntervalSecs,
     Members,
+    PayoutOrder,           // Vec<u32> — indices into Members array for payout order
     CurrentCycle,
     NextPayoutTime,
     Contributions(Address, u32), // (member, cycle) → bool
@@ -71,6 +72,7 @@ impl AjoContract {
         env.storage().instance().set(&DataKey::MaxMembers, &max_members);
         env.storage().instance().set(&DataKey::CycleIntervalSecs, &cycle_interval_secs);
         env.storage().instance().set(&DataKey::Members, &Vec::<Address>::new(&env));
+        env.storage().instance().set(&DataKey::PayoutOrder, &Vec::<u32>::new(&env));
         env.storage().instance().set(&DataKey::CurrentCycle, &0u32);
         env.storage().instance().set(&DataKey::Completed, &false);
 
@@ -158,6 +160,26 @@ impl AjoContract {
         env.events().publish((Symbol::new(&env, "contributed"),), (member, current_cycle));
     }
 
+    /// Set payout order for randomized circles. Admin-only, must be called before circle starts.
+    /// 
+    /// * `order` – Vec<u32> of member indices (0-based) in desired payout order
+    pub fn set_payout_order(env: Env, order: Vec<u32>) {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
+        admin.require_auth();
+
+        let current_cycle: u32 = env.storage().instance().get(&DataKey::CurrentCycle).expect("not initialized");
+        if current_cycle > 0 {
+            panic!("cannot set payout order after circle starts");
+        }
+
+        let max_members: u32 = env.storage().instance().get(&DataKey::MaxMembers).expect("not initialized");
+        if order.len() != max_members {
+            panic!("payout order length must equal max_members");
+        }
+
+        env.storage().instance().set(&DataKey::PayoutOrder, &order);
+    }
+
     /// Trigger payout to the current cycle's recipient. Only callable by admin after next_payout_time.
     pub fn payout(env: Env) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
@@ -180,9 +202,18 @@ impl AjoContract {
 
         let members: Vec<Address> = env.storage().instance().get(&DataKey::Members).expect("not initialized");
         let max_members: u32 = env.storage().instance().get(&DataKey::MaxMembers).expect("not initialized");
+        let payout_order: Vec<u32> = env.storage().instance().get(&DataKey::PayoutOrder).unwrap_or_else(|_| {
+            // Default to join order if no custom order set
+            let mut default_order = Vec::new(&env);
+            for i in 0..max_members {
+                default_order.push_back(i);
+            }
+            default_order
+        });
 
-        // Recipient is the member at position (current_cycle - 1)
-        let recipient = members.get(current_cycle - 1).expect("invalid cycle");
+        // Get recipient from payout order
+        let recipient_idx = payout_order.get(current_cycle - 1).expect("invalid cycle");
+        let recipient = members.get(recipient_idx).expect("invalid member index");
 
         let token: Address = env.storage().instance().get(&DataKey::Token).expect("not initialized");
         let contribution: i128 = env.storage().instance().get(&DataKey::ContributionAmount).expect("not initialized");
@@ -216,6 +247,11 @@ impl AjoContract {
     /// Read-only: get all members.
     pub fn get_members(env: Env) -> Vec<Address> {
         env.storage().instance().get(&DataKey::Members).unwrap_or(vec![&env])
+    }
+
+    /// Read-only: get payout order (indices into members array).
+    pub fn get_payout_order(env: Env) -> Vec<u32> {
+        env.storage().instance().get(&DataKey::PayoutOrder).unwrap_or(vec![&env])
     }
 
     /// Upgrade the contract WASM. Admin-only.
@@ -339,3 +375,6 @@ mod tests {
         client.contribute(&members.get(0).unwrap()); // second contribution same cycle
     }
 }
+
+#[cfg(test)]
+mod integration_tests;

@@ -16,7 +16,10 @@ export function CreateCircleForm() {
 
   const { register, handleSubmit, formState: { errors } } = useForm<CreateCircleInput>({
     resolver: zodResolver(createCircleSchema),
-    defaultValues: { cycleFrequency: "monthly" },
+    defaultValues: { 
+      cycleFrequency: "monthly",
+      circleType: "public"
+    },
   });
 
   const onSubmit = async (data: CreateCircleInput) => {
@@ -60,6 +63,17 @@ export function CreateCircleForm() {
           <option value="biweekly">Bi-weekly</option>
           <option value="monthly">Monthly</option>
         </select>
+      </div>
+
+      <div className="input-group">
+        <label className="input-label" htmlFor="circleType">Circle Type</label>
+        <select id="circleType" className="input" {...register("circleType")}>
+          <option value="public">Public (Anyone can join)</option>
+          <option value="private">Private (Requires approval)</option>
+        </select>
+        <small className="input-hint">
+          Private circles require you to approve each join request
+        </small>
       </div>
 
       {error && <p className={styles.error}>{error}</p>}

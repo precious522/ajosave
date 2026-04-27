@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import * as Sentry from "@sentry/nextjs";
 import type { ApiError } from "@/types";
+import { getRedis } from "@/lib/redis";
 
 type Handler = (_req: NextRequest, _ctx?: unknown) => Promise<NextResponse>;
 
@@ -13,6 +14,26 @@ export function withAuth(handler: Handler): Handler {
       return NextResponse.json<ApiError>(
         { success: false, error: "Unauthorized", code: "UNAUTHORIZED" },
         { status: 401 }
+      );
+    }
+    return handler(req, ctx);
+  };
+}
+
+export function withAdminAuth(handler: Handler): Handler {
+  return async (req, ctx) => {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json<ApiError>(
+        { success: false, error: "Unauthorized", code: "UNAUTHORIZED" },
+        { status: 401 }
+      );
+    }
+    const role = (session.user as { role?: string }).role;
+    if (role !== "admin") {
+      return NextResponse.json<ApiError>(
+        { success: false, error: "Forbidden", code: "FORBIDDEN" },
+        { status: 403 }
       );
     }
     return handler(req, ctx);
@@ -34,16 +55,69 @@ export function withErrorHandler(handler: Handler): Handler {
   };
 }
 
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-export function rateLimit(key: string, limit: number, windowMs: number): boolean {
+/**
+ * Redis sliding-window rate limiter.
+ * Returns { allowed, remaining, resetAt } so callers can set X-RateLimit-* headers.
+ */
+export async function rateLimit(
+  key: string,
+  limit: number,
+  windowMs: number
+): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+  const redis = await getRedis();
   const now = Date.now();
-  const entry = rateLimitMap.get(key);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
-    return true;
+  const windowStart = now - windowMs;
+  const redisKey = `rl:${key}`;
+
+  // Sliding window: remove old entries, add current timestamp, count
+  await redis.zRemRangeByScore(redisKey, 0, windowStart);
+  const count = await redis.zCard(redisKey);
+
+  if (count >= limit) {
+    const oldest = await redis.zRange(redisKey, 0, 0, { BY: "SCORE" });
+    const resetAt = oldest[0] ? parseInt(oldest[0]) + windowMs : now + windowMs;
+    return { allowed: false, remaining: 0, resetAt };
   }
-  if (entry.count >= limit) return false;
-  entry.count++;
-  return true;
+
+  await redis.zAdd(redisKey, { score: now, value: String(now) });
+  await redis.pExpire(redisKey, windowMs);
+  return { allowed: true, remaining: limit - count - 1, resetAt: now + windowMs };
+}
+
+/**
+ * Middleware wrapper that enforces rate limiting and sets X-RateLimit-* headers.
+ */
+export function withRateLimit(
+  handler: Handler,
+  { limit = 60, windowMs = 60_000 }: { limit?: number; windowMs?: number } = {}
+): Handler {
+  return async (req, ctx) => {
+    const ip =
+      req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+      req.headers.get("x-real-ip") ??
+      "unknown";
+    const routeKey = new URL(req.url).pathname;
+    const result = await rateLimit(`${routeKey}:${ip}`, limit, windowMs);
+
+    if (!result.allowed) {
+      return NextResponse.json<ApiError>(
+        { success: false, error: "Too many requests", code: "RATE_LIMITED" },
+        {
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": String(limit),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(Math.ceil(result.resetAt / 1000)),
+            "Retry-After": String(Math.ceil((result.resetAt - Date.now()) / 1000)),
+          },
+        }
+      );
+    }
+
+    const response = await handler(req, ctx);
+    response.headers.set("X-RateLimit-Limit", String(limit));
+    response.headers.set("X-RateLimit-Remaining", String(result.remaining));
+    response.headers.set("X-RateLimit-Reset", String(Math.ceil(result.resetAt / 1000)));
+    return response;
+  };
 }

@@ -2,35 +2,29 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 
 export function ContributeButton({ circleId }: { circleId: string }) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const handleContribute = async () => {
     setLoading(true);
-    setError(null);
     try {
       const res = await fetch(`/api/circles/${circleId}/contribute`, { method: "POST" });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
+      toast("Redirecting to payment…", "info");
       window.location.href = json.data.authorizationUrl;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to initiate payment");
+      toast(err instanceof Error ? err.message : "Failed to initiate payment", "error");
       setLoading(false);
     }
   };
 
   return (
-    <div>
-      <Button variant="accent" onClick={handleContribute} loading={loading}>
-        Contribute Now
-      </Button>
-      {error && (
-        <p style={{ marginTop: "0.5rem", fontSize: "var(--text-xs)", color: "var(--color-error)" }}>
-          {error}
-        </p>
-      )}
-    </div>
+    <Button variant="accent" onClick={handleContribute} loading={loading}>
+      Contribute Now
+    </Button>
   );
 }
