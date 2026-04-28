@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { NavLink } from "./NavLink";
 import styles from "./Navbar.module.css";
 
 export async function Navbar() {
@@ -20,9 +22,10 @@ export async function Navbar() {
           <li><Link href="/analytics" className={styles.link}>Analytics</Link></li>
           {isAdmin && <li><Link href="/admin" className={styles.link}>Admin</Link></li>}
           {session?.user
-            ? <li><Link href="/profile" className={styles.link}>Profile</Link></li>
+            ? <li><NavLink href="/profile">Profile</NavLink></li>
             : <li><Link href="/auth/login" className="btn btn--primary btn--sm">Sign In</Link></li>
           }
+          <li><ThemeToggle /></li>
         </ul>
       </nav>
     </header>

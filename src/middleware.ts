@@ -13,6 +13,24 @@ const ALLOWED_ORIGINS = [
 export function middleware(request: NextRequest) {
   const origin = request.headers.get("origin");
 
+  // Handle API versioning redirects
+  if (request.nextUrl.pathname.startsWith("/api/") && !request.nextUrl.pathname.startsWith("/api/v1/")) {
+    // Skip auth routes as they need special handling
+    if (!request.nextUrl.pathname.startsWith("/api/auth/")) {
+      const newUrl = request.nextUrl.clone();
+      newUrl.pathname = newUrl.pathname.replace('/api/', '/api/v1/');
+      
+      const response = NextResponse.redirect(newUrl, {
+        status: request.method === 'GET' ? 301 : 308,
+      });
+      
+      response.headers.set('X-API-Deprecated', 'true');
+      response.headers.set('X-API-Deprecation-Info', `This endpoint is deprecated. Use ${newUrl.pathname} instead.`);
+      
+      return response;
+    }
+  }
+
   // Handle CORS for API routes
   if (request.nextUrl.pathname.startsWith("/api/")) {
     const isAllowed = origin && ALLOWED_ORIGINS.includes(origin);

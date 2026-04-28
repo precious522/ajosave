@@ -4,10 +4,18 @@ info:
   description: |
     Trustless rotating savings circles (Ajo/Esusu) on the Stellar blockchain.
 
+    ## API Versioning
+    This API uses URL-based versioning. All endpoints are prefixed with `/api/v1/`.
+    
+    **Current version:** v1  
+    **Base URL:** `/api/v1/`
+
+    Legacy endpoints without version prefix (`/api/`) are deprecated and redirect to v1.
+
     ## Authentication
     Most endpoints require a valid session cookie obtained via the OTP login flow:
-    1. `POST /api/auth/send-otp` – request a 6-digit OTP to your phone
-    2. `POST /api/auth/verify-otp` – exchange OTP for a session cookie (NextAuth)
+    1. `POST /api/v1/auth/send-otp` – request a 6-digit OTP to your phone
+    2. `POST /api/v1/auth/verify-otp` – exchange OTP for a session cookie (NextAuth)
 
     The session cookie is automatically sent by the browser on subsequent requests.
     Server-to-server callers must include the `Cookie` header.
@@ -21,9 +29,9 @@ info:
     url: https://opensource.org/licenses/MIT
 
 servers:
-  - url: https://www.ajosave.app
+  - url: https://www.ajosave.app/api/v1
     description: Production
-  - url: http://localhost:3000
+  - url: http://localhost:3000/api/v1
     description: Local development
 
 tags:
@@ -231,7 +239,7 @@ components:
 # ─── Paths ─────────────────────────────────────────────────────────────────────
 paths:
   # ── Auth ────────────────────────────────────────────────────────────────────
-  /api/auth/send-otp:
+  /auth/send-otp:
     post:
       tags: [auth]
       summary: Request a phone OTP
@@ -276,7 +284,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/auth/logout:
+  /auth/logout:
     post:
       tags: [auth]
       summary: Sign out
@@ -288,7 +296,7 @@ paths:
           description: Signed out successfully
 
   # ── Circles ─────────────────────────────────────────────────────────────────
-  /api/circles:
+  /circles:
     get:
       tags: [circles]
       summary: List circles
@@ -384,7 +392,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/circles/{id}:
+  /circles/{id}:
     get:
       tags: [circles]
       summary: Get circle details
@@ -419,7 +427,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/circles/{id}/join:
+  /circles/{id}/join:
     post:
       tags: [circles]
       summary: Join a circle
@@ -469,7 +477,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/circles/{id}/contribute:
+  /circles/{id}/contribute:
     post:
       tags: [circles]
       summary: Initiate a contribution payment
@@ -527,7 +535,7 @@ paths:
           $ref: "#/components/responses/InternalError"
 
   # ── Cron ────────────────────────────────────────────────────────────────────
-  /api/cron/cycle:
+  /cron/cycle:
     get:
       tags: [cron]
       summary: Trigger cycle payout check
@@ -558,7 +566,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
 
   # ── Health ──────────────────────────────────────────────────────────────────
-  /api/health:
+  /health:
     get:
       tags: [health]
       summary: Health check

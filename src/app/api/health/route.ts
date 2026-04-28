@@ -1,49 +1,14 @@
-import { NextResponse } from "next/server";
-import { query, getPoolStats } from "@/lib/db";
-import { serverConfig } from "@/server/config";
+import { NextRequest, NextResponse } from "next/server";
 
-async function checkDb(): Promise<boolean> {
-  try {
-    await query("SELECT 1");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function checkRedis(): Promise<boolean> {
-  try {
-    const { createClient } = await import("redis");
-    const client = createClient({ url: serverConfig.redis.url });
-    await client.connect();
-    await client.ping();
-    await client.disconnect();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function GET() {
-  const [db, redis] = await Promise.all([checkDb(), checkRedis()]);
-
-  const healthy = db && redis;
-  const poolStats = getPoolStats();
-
-  return NextResponse.json(
-    {
-      status: healthy ? "ok" : "degraded",
-      db: db ? "ok" : "error",
-      redis: redis ? "ok" : "error",
-      pool: poolStats
-        ? {
-            total: poolStats.totalCount,
-            idle: poolStats.idleCount,
-            waiting: poolStats.waitingCount,
-          }
-        : null,
-      timestamp: new Date().toISOString(),
-    },
-    { status: healthy ? 200 : 503 }
-  );
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const newUrl = url.pathname.replace('/api/health', '/api/v1/health');
+  
+  return NextResponse.redirect(new URL(newUrl + url.search, url.origin), {
+    status: 301,
+    headers: {
+      'X-API-Deprecated': 'true',
+      'X-API-Deprecation-Info': 'This endpoint is deprecated. Use /api/v1/health instead.',
+    }
+  });
 }
