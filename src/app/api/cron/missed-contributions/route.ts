@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processMissedContributions } from "@/server/services/scheduler.service";
-import { serverConfig } from "@/server/config";
+import { verifyCronSecret } from "@/lib/cron-auth";
 
 /**
  * Cron endpoint to process missed contributions
@@ -9,18 +9,10 @@ import { serverConfig } from "@/server/config";
  * Authorization: Bearer <CRON_SECRET>
  */
 export async function GET(req: NextRequest) {
-  try {
-    // Verify cron secret
-    const authHeader = req.headers.get("authorization");
-    const token = authHeader?.replace("Bearer ", "");
-    
-    if (token !== serverConfig.cronSecret) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+  const unauth = verifyCronSecret(req);
+  if (unauth) return unauth;
 
+  try {
     await processMissedContributions();
 
     return NextResponse.json({

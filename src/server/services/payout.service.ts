@@ -1,9 +1,9 @@
-import { query } from "@/lib/db";
+import { query, transaction } from "@/lib/db";
 import { sendUsdcPayment, horizonServer, USDC } from "@/lib/stellar";
 import { invokeContractPayout } from "@/lib/soroban";
 import { getCircleById, getMembersByCircle, updateCircleStatus } from "./circle.service";
 import { withPayoutLock, PayoutLockError } from "./payout-lock";
-import { notifyPayoutProcessed } from "./notification.service";
+import { notifyPayoutProcessed, notifyCircleCompleted } from "./notification.service";
 import type { Payout } from "@/types";
 import { randomUUID } from "crypto";
 import { StrKey } from "@stellar/stellar-sdk";
@@ -81,26 +81,42 @@ export async function processCyclePayout(
     const recipientMember = circleMembers[circle.currentCycle - 1];
     const recipientMemberId = recipientMember?.id ?? "";
 
-    // Persist payout to PostgreSQL
-    const { rows } = await query<Payout>(
-      `INSERT INTO payouts (id, circle_id, recipient_member_id, cycle_number, amount_usdc, tx_hash, paid_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())
-       RETURNING id, circle_id as "circleId", recipient_member_id as "recipientMemberId", 
-                 cycle_number as "cycleNumber", amount_usdc as "amountUsdc", tx_hash as "txHash", paid_at as "paidAt"`,
-      [payoutId, circleId, recipientMemberId, circle.currentCycle, totalPot, txHash]
-    );
+    // Atomically persist the payout record and mark the member as paid.
+    // The UNIQUE constraint on (circle_id, cycle_number) provides a second
+    // layer of idempotency at the database level — a duplicate call for the
+    // same cycle will fail with a unique-violation error before any money moves.
+    let payout: Payout;
+    try {
+      payout = await transaction(async (q) => {
+        const { rows } = await q<Payout>(
+          `INSERT INTO payouts (id, circle_id, recipient_member_id, cycle_number, amount_usdc, tx_hash, paid_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())
+           RETURNING id, circle_id as "circleId", recipient_member_id as "recipientMemberId",
+                     cycle_number as "cycleNumber", amount_usdc as "amountUsdc", tx_hash as "txHash", paid_at as "paidAt"`,
+          [payoutId, circleId, recipientMemberId, circle.currentCycle, totalPot, txHash]
+        );
 
-    const payout = rows[0];
+        // Mark recipient as having received their payout within the same transaction
+        // so the flag is always consistent with the payout record.
+        if (recipientMemberId) {
+          await q(
+            "UPDATE members SET has_received_payout = TRUE, updated_at = NOW() WHERE id = $1",
+            [recipientMemberId]
+          );
+        }
 
-    // Mark recipient as having received their payout (idempotency guard)
-    if (recipientMemberId) {
-      await query(
-        "UPDATE members SET has_received_payout = TRUE WHERE id = $1",
-        [recipientMemberId]
-      );
+        return rows[0];
+      });
+    } catch (err: unknown) {
+      // Surface duplicate-cycle violations as a clean application error
+      const pg = err as { code?: string };
+      if (pg.code === "23505") {
+        throw new Error(`Payout for cycle ${circle.currentCycle} has already been processed`);
+      }
+      throw err;
     }
 
-    // Send SMS notifications to all members
+    // Send SMS notifications to all members (async, non-blocking)
     if (recipientMember) {
       const memberUserIds = circleMembers.map(m => m.userId);
       const { rows: recipientUser } = await query<{ display_name: string }>(
@@ -108,8 +124,7 @@ export async function processCyclePayout(
         [recipientMember.userId]
       );
       const recipientName = recipientUser[0]?.display_name ?? "Member";
-      
-      // Notify all members about the payout (async, don't block)
+
       notifyPayoutProcessed(memberUserIds, circle.name, totalPot, recipientName).catch(err => {
         console.error("Failed to send payout notifications:", err);
       });
@@ -117,13 +132,12 @@ export async function processCyclePayout(
 
     if (circle.currentCycle >= circleMembers.length) {
       await updateCircleStatus(circleId, "completed");
-      
-      // Send completion notifications to all members
-      for (const member of circleMembers) {
-        await sendCircleCompletedNotification(member.userId, circle.name).catch((err) =>
-          console.error("[payout] Failed to send completion notification:", err)
-        );
-      }
+
+      // Send completion notifications to all members (async, non-blocking)
+      const memberUserIds = circleMembers.map(m => m.userId);
+      notifyCircleCompleted(memberUserIds, circle.name).catch((err) =>
+        console.error("[payout] Failed to send completion notifications:", err)
+      );
     }
 
     return payout;

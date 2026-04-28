@@ -6,6 +6,8 @@ import {
   sendContributionReceivedSms,
   sendJoinRequestApprovedSms,
   sendJoinRequestRejectedSms,
+  sendCircleCancelledSms,
+  sendCircleCancelledNoRefundSms,
 } from "@/lib/sms";
 import type { User } from "@/types";
 
@@ -167,4 +169,53 @@ export async function toggleSmsNotifications(
     "UPDATE users SET sms_notifications_enabled = $1 WHERE id = $2",
     [enabled, userId]
   );
+}
+
+/**
+ * Notify all circle members when the circle completes (all payouts done)
+ */
+export async function notifyCircleCompleted(
+  memberUserIds: string[],
+  circleName: string
+): Promise<void> {
+  const notifications = memberUserIds.map(async (userId) => {
+    if (!(await canSendSms(userId))) return;
+
+    const phone = await getUserPhone(userId);
+    if (!phone) return;
+
+    try {
+      // Reuse the payout-processed SMS with a completion message
+      await sendPayoutProcessedSms(phone, circleName, "0", "everyone — the circle is complete!");
+    } catch (error) {
+      console.error(`Failed to send circle completion notification to ${userId}:`, error);
+    }
+  });
+
+  await Promise.allSettled(notifications);
+}
+
+/**
+ * Notify a member that their circle was cancelled.
+ * If a refund was issued, include the amount; otherwise send a no-refund variant.
+ */
+export async function notifyCircleCancelled(
+  userId: string,
+  circleName: string,
+  refundAmountUsdc: string | null
+): Promise<void> {
+  if (!(await canSendSms(userId))) return;
+
+  const phone = await getUserPhone(userId);
+  if (!phone) return;
+
+  try {
+    if (refundAmountUsdc) {
+      await sendCircleCancelledSms(phone, circleName, refundAmountUsdc);
+    } else {
+      await sendCircleCancelledNoRefundSms(phone, circleName);
+    }
+  } catch (error) {
+    console.error(`Failed to send circle cancellation notification to ${userId}:`, error);
+  }
 }

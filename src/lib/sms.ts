@@ -81,3 +81,20 @@ export async function sendJoinRequestRejectedSms(
   const message = `Ajosave: Your join request for "${circleName}" has been declined by the creator.`;
   await sendSms(phone, message);
 }
+
+export async function sendCircleCancelledSms(
+  phone: string,
+  circleName: string,
+  refundAmount: string
+): Promise<void> {
+  const message = `Ajosave: The circle "${circleName}" has been cancelled by the creator. A refund of ${refundAmount} USDC has been sent to your Stellar wallet.`;
+  await sendSms(phone, message);
+}
+
+export async function sendCircleCancelledNoRefundSms(
+  phone: string,
+  circleName: string
+): Promise<void> {
+  const message = `Ajosave: The circle "${circleName}" has been cancelled by the creator. You had no confirmed contributions, so no refund is needed.`;
+  await sendSms(phone, message);
+}
