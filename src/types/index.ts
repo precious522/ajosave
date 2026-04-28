@@ -51,7 +51,7 @@ export interface Member {
 }
 
 // ─── Contribution ─────────────────────────────────────────────────────────────
-export type ContributionStatus = "pending" | "confirmed" | "missed";
+export type ContributionStatus = "pending" | "confirmed" | "missed" | "refund_pending" | "refunded";
 
 export interface Contribution {
   id: string;
@@ -62,6 +62,7 @@ export interface Contribution {
   status: ContributionStatus;
   txHash?: string;
   createdAt: Date;
+  updatedAt?: Date;
 }
 
 // ─── Payout ───────────────────────────────────────────────────────────────────

@@ -6,6 +6,8 @@ import {
   sendContributionReceivedSms,
   sendJoinRequestApprovedSms,
   sendJoinRequestRejectedSms,
+  sendCircleCancelledSms,
+  sendCircleCancelledNoRefundSms,
 } from "@/lib/sms";
 import type { User } from "@/types";
 
@@ -191,4 +193,29 @@ export async function notifyCircleCompleted(
   });
 
   await Promise.allSettled(notifications);
+}
+
+/**
+ * Notify a member that their circle was cancelled.
+ * If a refund was issued, include the amount; otherwise send a no-refund variant.
+ */
+export async function notifyCircleCancelled(
+  userId: string,
+  circleName: string,
+  refundAmountUsdc: string | null
+): Promise<void> {
+  if (!(await canSendSms(userId))) return;
+
+  const phone = await getUserPhone(userId);
+  if (!phone) return;
+
+  try {
+    if (refundAmountUsdc) {
+      await sendCircleCancelledSms(phone, circleName, refundAmountUsdc);
+    } else {
+      await sendCircleCancelledNoRefundSms(phone, circleName);
+    }
+  } catch (error) {
+    console.error(`Failed to send circle cancellation notification to ${userId}:`, error);
+  }
 }

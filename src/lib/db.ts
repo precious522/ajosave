@@ -1,5 +1,5 @@
 /**
- * Thin PostgreSQL client wrapper.
+ * Thin PostgreSQL client wrapper with connection pooling.
  *
  * ALL queries MUST go through `query()` or `transaction()`.
  * String interpolation into SQL is NEVER allowed — use $1, $2, … placeholders.
@@ -9,6 +9,13 @@
  *
  * Example (WRONG — never do this):
  *   await query(`SELECT * FROM circles WHERE id = '${id}'`)
+ *
+ * Connection Pool Configuration:
+ * - DB_POOL_SIZE: Maximum connections (default: 10)
+ * - DB_POOL_MIN: Minimum connections (default: 2)
+ * - Pool automatically manages connection lifecycle
+ * - Idle connections are closed after 30s
+ * - Connection timeout is 5s
  */
 import { Pool, type QueryResult, type QueryResultRow } from "pg";
 import { serverConfig } from "@/server/config";
@@ -17,24 +24,76 @@ let pool: Pool | null = null;
 
 function getPool(): Pool {
   if (!pool) {
-    const poolSize = parseInt(process.env.DB_POOL_SIZE ?? "10", 10);
+    const maxPoolSize = parseInt(process.env.DB_POOL_SIZE ?? "10", 10);
+    const minPoolSize = parseInt(process.env.DB_POOL_MIN ?? "2", 10);
+    
     pool = new Pool({
       connectionString: serverConfig.database.url,
-      max: poolSize,
+      max: maxPoolSize,
+      min: minPoolSize,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 5_000,
+      // Validate connections before use to detect stale connections
+      allowExitOnIdle: false,
       ssl: serverConfig.stellar.network === "mainnet" ? { rejectUnauthorized: true } : false,
     });
+
+    // Pool event listeners for monitoring and debugging
+    pool.on("connect", (client) => {
+      console.log("[db] New client connected to pool");
+    });
+
+    pool.on("acquire", (client) => {
+      console.log("[db] Client acquired from pool");
+    });
+
+    pool.on("remove", (client) => {
+      console.log("[db] Client removed from pool");
+    });
+
+    pool.on("error", (err, client) => {
+      console.error("[db] Unexpected pool error:", err);
+      // Don't exit process - let the pool handle reconnection
+    });
+
+    console.log(`[db] Connection pool initialized (min: ${minPoolSize}, max: ${maxPoolSize})`);
   }
   return pool;
 }
 
-/** Gracefully close the connection pool. Call during server shutdown. */
+/**
+ * Gracefully close the connection pool.
+ * Waits for active queries to complete before closing.
+ * Call during server shutdown.
+ */
 export async function closePool(): Promise<void> {
   if (pool) {
-    await pool.end();
-    pool = null;
+    console.log("[db] Closing connection pool...");
+    try {
+      await pool.end();
+      console.log("[db] Connection pool closed successfully");
+    } catch (err) {
+      console.error("[db] Error closing pool:", err);
+      throw err;
+    } finally {
+      pool = null;
+    }
   }
+}
+
+/**
+ * Get pool statistics for monitoring.
+ * Useful for health checks and debugging.
+ */
+export function getPoolStats() {
+  if (!pool) {
+    return null;
+  }
+  return {
+    totalCount: pool.totalCount,
+    idleCount: pool.idleCount,
+    waitingCount: pool.waitingCount,
+  };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { query, getPoolStats } from "@/lib/db";
 import { serverConfig } from "@/server/config";
 
 async function checkDb(): Promise<boolean> {
@@ -28,11 +28,20 @@ export async function GET() {
   const [db, redis] = await Promise.all([checkDb(), checkRedis()]);
 
   const healthy = db && redis;
+  const poolStats = getPoolStats();
+
   return NextResponse.json(
     {
       status: healthy ? "ok" : "degraded",
       db: db ? "ok" : "error",
       redis: redis ? "ok" : "error",
+      pool: poolStats
+        ? {
+            total: poolStats.totalCount,
+            idle: poolStats.idleCount,
+            waiting: poolStats.waitingCount,
+          }
+        : null,
       timestamp: new Date().toISOString(),
     },
     { status: healthy ? 200 : 503 }
