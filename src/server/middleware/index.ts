@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import * as Sentry from "@sentry/nextjs";
 import type { ApiError } from "@/types";
 import { getRedis } from "@/lib/redis";
+import { randomUUID } from "crypto";
+import logger from "@/lib/logger";
 
 type Handler = (_req: NextRequest, _ctx?: unknown) => Promise<NextResponse>;
 
@@ -42,15 +44,38 @@ export function withAdminAuth(handler: Handler): Handler {
 
 export function withErrorHandler(handler: Handler): Handler {
   return async (req, ctx) => {
+    const requestId =
+      req.headers.get("x-request-id") ?? randomUUID();
+    const { pathname } = new URL(req.url);
+    const start = Date.now();
+    const reqLogger = logger.child({ requestId });
+
     try {
-      return await handler(req, ctx);
+      const response = await handler(req, ctx);
+      reqLogger.info({
+        method: req.method,
+        path: pathname,
+        statusCode: response.status,
+        durationMs: Date.now() - start,
+      });
+      response.headers.set("x-request-id", requestId);
+      return response;
     } catch (err) {
-      Sentry.captureException(err, { extra: { url: req.url, method: req.method } });
-      console.error("[API Error]", err);
-      return NextResponse.json<ApiError>(
+      const durationMs = Date.now() - start;
+      Sentry.captureException(err, { extra: { url: req.url, method: req.method, requestId } });
+      reqLogger.error({
+        method: req.method,
+        path: pathname,
+        statusCode: 500,
+        durationMs,
+        err,
+      });
+      const res = NextResponse.json<ApiError>(
         { success: false, error: "Internal server error", code: "INTERNAL_ERROR" },
         { status: 500 }
       );
+      res.headers.set("x-request-id", requestId);
+      return res;
     }
   };
 }
