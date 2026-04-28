@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { getCurrencySymbol, SupportedCurrency } from "@/lib/currency";
 import type { Circle } from "@/types";
 import styles from "./JoinCircleForm.module.css";
+import { useFreighterWallet } from "@/hooks/useFreighterWallet";
+import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 
 interface Props {
   circle: Circle;
@@ -18,6 +20,20 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stellarPublicKey, setStellarPublicKey] = useState("");
+
+  const { connectionState, publicKey, error: walletError, connect, disconnect } = useFreighterWallet();
+
+  useEffect(() => {
+    if (publicKey !== null) {
+      setStellarPublicKey(publicKey);
+    }
+  }, [publicKey]);
+
+  useEffect(() => {
+    if (connectionState === "disconnected") {
+      setStellarPublicKey("");
+    }
+  }, [connectionState]);
 
   const currencySymbol = getCurrencySymbol(circle.contributionCurrency as SupportedCurrency);
 
@@ -85,6 +101,27 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
           <p className={styles.help}>
             This is where your payouts will be sent. Make sure it's a valid Stellar address.
           </p>
+          {connectionState !== "not_installed" && (
+            <ConnectWalletButton
+              connectionState={connectionState}
+              onConnect={connect}
+              onDisconnect={disconnect}
+              publicKey={publicKey}
+            />
+          )}
+          {connectionState === "not_installed" && (
+            <p className={styles.help}>
+              Don&apos;t have a Stellar wallet?{" "}
+              <a href="https://freighter.app" target="_blank" rel="noopener noreferrer">
+                Install Freighter
+              </a>
+            </p>
+          )}
+          {walletError && (
+            <p role="alert" style={{ color: "var(--color-error)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
+              {walletError}
+            </p>
+          )}
         </div>
 
         {error && <div className={styles.error}>{error}</div>}

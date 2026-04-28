@@ -5,10 +5,14 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 import type { ProfileData } from "@/app/api/profile/route";
+import { useFreighterWallet } from "@/hooks/useFreighterWallet";
+import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  const { connectionState, publicKey, error: walletError, connect, disconnect } = useFreighterWallet();
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [form, setForm] = useState({ displayName: "", email: "", stellarPublicKey: "" });
@@ -34,6 +38,18 @@ export default function ProfilePage() {
         }
       });
   }, [status]);
+
+  useEffect(() => {
+    if (publicKey !== null) {
+      setForm((f) => ({ ...f, stellarPublicKey: publicKey }));
+    }
+  }, [publicKey]);
+
+  useEffect(() => {
+    if (connectionState === "disconnected") {
+      setForm((f) => ({ ...f, stellarPublicKey: "" }));
+    }
+  }, [connectionState]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,6 +182,27 @@ export default function ProfilePage() {
                 placeholder="GXXXXXXX…"
                 spellCheck={false}
               />
+              {connectionState !== "not_installed" && (
+                <ConnectWalletButton
+                  connectionState={connectionState}
+                  onConnect={connect}
+                  onDisconnect={disconnect}
+                  publicKey={publicKey}
+                />
+              )}
+              {connectionState === "not_installed" && (
+                <small className="input-hint">
+                  Don&apos;t have a Stellar wallet?{" "}
+                  <a href="https://freighter.app" target="_blank" rel="noopener noreferrer">
+                    Install Freighter
+                  </a>
+                </small>
+              )}
+              {walletError && (
+                <p role="alert" style={{ color: "var(--color-error)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
+                  {walletError}
+                </p>
+              )}
             </div>
 
             {message && (
