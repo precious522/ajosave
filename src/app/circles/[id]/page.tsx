@@ -9,6 +9,7 @@ import { PayoutCountdown } from "@/components/circle/PayoutCountdown";
 import { getCurrencySymbol, SupportedCurrency } from "@/lib/currency";
 import { format } from "date-fns";
 import type { Metadata } from "next";
+import { CircleChat } from "@/components/circle/CircleChat";
 import styles from "./page.module.css";
 
 interface Props {
@@ -55,6 +56,7 @@ export default async function CircleDetailPage({ params }: Props) {
   const userId = (session?.user as { id?: string } | undefined)?.id;
   const isCreator = userId === circle.creatorId;
   const isMember = members.some((m) => m.userId === userId);
+  const isActiveMember = members.some((m) => m.userId === userId && m.status === "active");
   const currencySymbol = getCurrencySymbol(circle.contributionCurrency as SupportedCurrency);
 
   return (
@@ -113,6 +115,14 @@ export default async function CircleDetailPage({ params }: Props) {
             isCreator={isCreator}
           />
         </div>
+
+        {userId && (
+          <CircleChat
+            circleId={circle.id}
+            isActiveMember={isActiveMember}
+            currentUserId={userId}
+          />
+        )}
       </div>
     </div>
   );

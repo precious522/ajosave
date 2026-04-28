@@ -81,6 +81,16 @@ export interface Payout {
   paidAt: Date;
 }
 
+// ─── Circle Chat ──────────────────────────────────────────────────────────────
+export interface CircleMessage {
+  id: string;
+  circleId: string;
+  userId: string;
+  displayName: string;  // joined from users table at read time
+  content: string;
+  createdAt: string;    // ISO 8601 string
+}
+
 // ─── API ──────────────────────────────────────────────────────────────────────
 export interface ApiSuccess<T> {
   success: true;

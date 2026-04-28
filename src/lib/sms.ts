@@ -56,6 +56,16 @@ export async function sendMissedContributionSms(
   await sendSms(phone, message);
 }
 
+export async function sendContributionReminderSms(
+  phone: string,
+  circleName: string,
+  amount: string,
+  hoursLeft: number
+): Promise<void> {
+  const message = `Ajosave: Your contribution of ${amount} USDC to "${circleName}" is due in ${hoursLeft} hours. Please contribute now to avoid being marked as defaulted!`;
+  await sendSms(phone, message);
+}
+
 export async function sendContributionReceivedSms(
   phone: string,
   circleName: string,

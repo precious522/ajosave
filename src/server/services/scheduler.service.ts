@@ -1,5 +1,5 @@
 import { query } from "@/lib/db";
-import { notifyPayoutReminder, notifyMissedContribution } from "./notification.service";
+import { notifyPayoutReminder, notifyMissedContribution, notifyContributionReminder } from "./notification.service";
 import { getMissedContributions } from "./contribution.service";
 import type { Circle, Member } from "@/types";
 
@@ -87,6 +87,97 @@ export async function processMissedContributions(): Promise<void> {
       }
     } catch (error) {
       console.error(`Failed to process missed contributions for circle ${circle.id}:`, error);
+    }
+  }
+}
+
+type ReminderWindow = { hoursLeft: number; lowerBound: string; upperBound: string };
+
+const WINDOWS: ReminderWindow[] = [
+  { hoursLeft: 24, lowerBound: '23 hours', upperBound: '25 hours' },
+  { hoursLeft: 2,  lowerBound: '1 hour',   upperBound: '3 hours'  },
+];
+
+/**
+ * Send contribution reminders for both the 24h and 2h windows.
+ * Idempotent: uses the contribution_reminders table to prevent duplicates.
+ * Per-circle errors are caught and logged; they do not abort the run.
+ */
+export async function sendContributionReminders(): Promise<void> {
+  for (const { hoursLeft, lowerBound, upperBound } of WINDOWS) {
+    const reminderType = `${hoursLeft}h`;
+
+    const { rows: circles } = await query<Circle>(
+      `SELECT id, name, status, next_payout_at as "nextPayoutAt",
+              current_cycle as "currentCycle", contribution_usdc as "contributionUsdc"
+       FROM circles
+       WHERE status = 'active'
+         AND next_payout_at IS NOT NULL
+         AND next_payout_at > NOW() + INTERVAL '${lowerBound}'
+         AND next_payout_at < NOW() + INTERVAL '${upperBound}'`
+    );
+
+    for (const circle of circles) {
+      try {
+        const { rows: members } = await query<{ id: string; userId: string }>(
+          `SELECT m.id, m.user_id as "userId"
+           FROM members m
+           WHERE m.circle_id = $1
+             AND m.status = 'active'`,
+          [circle.id]
+        );
+
+        for (const member of members) {
+          // Check if member has already confirmed their contribution for this cycle
+          const { rows: confirmedRows } = await query(
+            `SELECT 1 FROM contributions
+             WHERE member_id = $1
+               AND circle_id = $2
+               AND cycle_number = $3
+               AND status = 'confirmed'`,
+            [member.id, circle.id, circle.currentCycle]
+          );
+          if (confirmedRows.length > 0) continue; // already confirmed — not a Pending_Contributor
+
+          // Check if contribution is 'missed' — also not a Pending_Contributor
+          const { rows: statusRows } = await query<{ status: string }>(
+            `SELECT status FROM contributions
+             WHERE member_id = $1
+               AND circle_id = $2
+               AND cycle_number = $3`,
+            [member.id, circle.id, circle.currentCycle]
+          );
+          if (statusRows.length > 0 && statusRows[0].status === 'missed') continue;
+
+          // Check idempotency — has this reminder already been sent?
+          const { rows: reminderRows } = await query(
+            `SELECT 1 FROM contribution_reminders
+             WHERE member_id = $1
+               AND cycle_number = $2
+               AND reminder_type = $3`,
+            [member.id, circle.currentCycle, reminderType]
+          );
+          if (reminderRows.length > 0) continue; // already reminded this window/cycle
+
+          // Send the reminder
+          await notifyContributionReminder(
+            member.userId,
+            circle.name,
+            circle.contributionUsdc,
+            hoursLeft
+          );
+
+          // Record that we sent the reminder (idempotency insert)
+          await query(
+            `INSERT INTO contribution_reminders (id, member_id, cycle_number, reminder_type, sent_at)
+             VALUES (gen_random_uuid(), $1, $2, $3, NOW())
+             ON CONFLICT DO NOTHING`,
+            [member.id, circle.currentCycle, reminderType]
+          );
+        }
+      } catch (error) {
+        console.error(`Failed to send contribution reminders for circle ${circle.id}:`, error);
+      }
     }
   }
 }

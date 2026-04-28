@@ -3,6 +3,7 @@ import {
   sendPayoutReminderSms,
   sendPayoutProcessedSms,
   sendMissedContributionSms,
+  sendContributionReminderSms,
   sendContributionReceivedSms,
   sendJoinRequestApprovedSms,
   sendJoinRequestRejectedSms,
@@ -51,6 +52,29 @@ export async function notifyPayoutReminder(
     await sendPayoutReminderSms(phone, circleName, amount, hoursUntilPayout);
   } catch (error) {
     console.error(`Failed to send payout reminder to ${userId}:`, error);
+  }
+}
+
+/**
+ * Send a contribution reminder SMS to a member before the cycle deadline.
+ * Checks that the user has SMS notifications enabled and a phone number on file.
+ * Logs but does not throw if the SMS delivery fails.
+ */
+export async function notifyContributionReminder(
+  userId: string,
+  circleName: string,
+  amount: string,
+  hoursLeft: number
+): Promise<void> {
+  if (!(await canSendSms(userId))) return;
+
+  const phone = await getUserPhone(userId);
+  if (!phone) return;
+
+  try {
+    await sendContributionReminderSms(phone, circleName, amount, hoursLeft);
+  } catch (error) {
+    console.error(`Failed to send contribution reminder to ${userId}:`, error);
   }
 }
 

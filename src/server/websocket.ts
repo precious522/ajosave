@@ -32,6 +32,14 @@ export interface WebSocketEvents {
     circleId: string;
     timestamp: string;
   };
+  "chat:message": {
+    id: string;
+    circleId: string;
+    userId: string;
+    displayName: string;
+    content: string;
+    createdAt: string;
+  };
 }
 
 /**
@@ -167,6 +175,18 @@ export function broadcastCircleCompleted(circleId: string): void {
 
   io.to(`circle:${circleId}`).emit("circle:completed", event);
   console.log(`[websocket] Broadcasted circle:completed to circle:${circleId}`);
+}
+
+/**
+ * Broadcast a new chat message to all members in a circle room
+ */
+export function broadcastChatMessage(
+  circleId: string,
+  message: WebSocketEvents["chat:message"]
+): void {
+  if (!io) return;
+  io.to(`circle:${circleId}`).emit("chat:message", message);
+  console.log(`[websocket] Broadcasted chat:message to circle:${circleId}`);
 }
 
 /**
