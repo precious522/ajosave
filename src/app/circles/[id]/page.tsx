@@ -45,6 +45,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+// CircleDetailPage
 export default async function CircleDetailPage({ params }: Props) {
   const [circle, members, session] = await Promise.all([
     getCircleById(params.id),
@@ -96,7 +97,9 @@ export default async function CircleDetailPage({ params }: Props) {
               </div>
               <div className={styles.detailRow}>
                 <dt>Members</dt>
-                <dd>{members.length} / {circle.maxMembers}</dd>
+                <dd>
+                  {members.length} / {circle.maxMembers}
+                </dd>
               </div>
               <div className={styles.detailRow}>
                 <dt>Current Cycle</dt>
@@ -115,19 +118,11 @@ export default async function CircleDetailPage({ params }: Props) {
             )}
           </div>
 
-          <MemberPayoutList
-            circle={circle}
-            initialMembers={members}
-            isCreator={isCreator}
-          />
+          <MemberPayoutList circle={circle} initialMembers={members} isCreator={isCreator} />
         </div>
 
         {userId && (
-          <CircleChat
-            circleId={circle.id}
-            isActiveMember={isActiveMember}
-            currentUserId={userId}
-          />
+          <CircleChat circleId={circle.id} isActiveMember={isActiveMember} currentUserId={userId} />
         )}
       </div>
     </div>
