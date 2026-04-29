@@ -22,6 +22,7 @@ const CIRCLE_SELECT = `
   cycle_frequency as "cycleFrequency", 
   payout_method as "payoutMethod", 
   randomization_seed as "randomizationSeed",
+  grace_period_hours as "gracePeriodHours",
   status, contract_id as "contractId", 
   current_cycle as "currentCycle", 
   (SELECT COUNT(*)::int FROM members WHERE circle_id = circles.id AND status = 'active') as "memberCount",
@@ -54,11 +55,11 @@ export async function createCircle(
   const { rows } = await query<Circle>(
     `INSERT INTO circles
        (id, name, creator_id, contribution_usdc, contribution_fiat, contribution_currency,
-        max_members, cycle_frequency, payout_method, contract_id, status, current_cycle, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'open',0,NOW(),NOW())
+        max_members, cycle_frequency, payout_method, contract_id, grace_period_hours, status, current_cycle, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'open',0,NOW(),NOW())
      RETURNING ${CIRCLE_SELECT}`,
     [id, input.name, creatorId, contributionUsdc, input.contributionAmount, input.contributionCurrency,
-     input.maxMembers, input.cycleFrequency, input.payoutMethod, contractId]
+     input.maxMembers, input.cycleFrequency, input.payoutMethod, contractId, input.gracePeriodHours ?? 24]
   );
   return rows[0];
 }

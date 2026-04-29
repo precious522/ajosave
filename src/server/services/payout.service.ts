@@ -57,8 +57,10 @@ export async function processCyclePayout(
     if (circle.status !== "active") throw new Error("Circle is not active");
 
     const circleMembers = await getMembersByCircle(circleId);
+    // Only count active members (exclude defaulted) for the pot
+    const activeMembers = circleMembers.filter((m) => m.status === "active");
     const totalPot = (
-      parseFloat(circle.contributionUsdc) * circleMembers.length
+      parseFloat(circle.contributionUsdc) * activeMembers.length
     ).toFixed(7);
 
     // Guard: reject if the current cycle's recipient already received a payout

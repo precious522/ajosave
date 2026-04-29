@@ -32,6 +32,7 @@ export interface Circle {
   cycleFrequency: CycleFrequency;
   payoutMethod: PayoutMethod;
   randomizationSeed?: string; // stored seed for verifiability
+  gracePeriodHours: number;   // hours after cycle start before member is marked defaulted
   status: CircleStatus;
   contractId?: string;        // deployed Soroban circle contract
   currentCycle: number;       // 1-indexed
