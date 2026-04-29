@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
-import type { ProfileData } from "@/app/api/profile/route";
+import type { ProfileData } from "@/app/api/v1/profile/route";
 import type { ReferralData } from "@/app/api/referral/route";
+import { useFreighterWallet } from "@/hooks/useFreighterWallet";
+import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
@@ -18,6 +20,8 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [referral, setReferral] = useState<ReferralData | null>(null);
+  const [stellarKeyError, setStellarKeyError] = useState<string | null>(null);
+  const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState("");
   const [referralMsg, setReferralMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [applyingCode, setApplyingCode] = useState(false);
@@ -29,7 +33,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (status !== "authenticated") return;
-    fetch("/api/profile")
+    fetch("/api/v1/profile")
       .then((r) => r.json())
       .then((json) => {
         if (json.success) {
@@ -45,6 +49,24 @@ export default function ProfilePage() {
       .then((r) => r.json())
       .then((json) => { if (json.success) setReferral(json.data); });
   }, [status]);
+
+  // Sync Freighter wallet public key into the form field
+  useEffect(() => {
+    if (publicKey) {
+      setForm((f) => ({ ...f, stellarPublicKey: publicKey }));
+      setStellarKeyError(null);
+    }
+  }, [publicKey]);
+
+  // Fetch USDC balance whenever the saved key changes
+  useEffect(() => {
+    const key = profile?.stellarPublicKey;
+    if (!key) { setUsdcBalance(null); return; }
+    fetch(`/api/stellar/balance?publicKey=${encodeURIComponent(key)}`)
+      .then((r) => r.json())
+      .then((json) => { if (json.success) setUsdcBalance(json.data.balance); })
+      .catch(() => {});
+  }, [profile?.stellarPublicKey]);
 
   const handleCopyCode = () => {
     if (!referral?.referralCode) return;
@@ -78,10 +100,16 @@ export default function ProfilePage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Client-side Stellar key validation
+    if (form.stellarPublicKey && !/^G[A-Z2-7]{55}$/.test(form.stellarPublicKey)) {
+      setStellarKeyError("Invalid Stellar public key format (must start with G and be 56 characters)");
+      return;
+    }
+    setStellarKeyError(null);
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/profile", {
+      const res = await fetch("/api/v1/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -255,7 +283,10 @@ export default function ProfilePage() {
                 id="stellarPublicKey"
                 className="input"
                 value={form.stellarPublicKey}
-                onChange={(e) => setForm((f) => ({ ...f, stellarPublicKey: e.target.value }))}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, stellarPublicKey: e.target.value }));
+                  setStellarKeyError(null);
+                }}
                 placeholder="GXXXXXXX…"
                 spellCheck={false}
               />
@@ -275,9 +306,19 @@ export default function ProfilePage() {
                   </a>
                 </small>
               )}
+              {stellarKeyError && (
+                <p role="alert" style={{ color: "var(--color-error)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
+                  {stellarKeyError}
+                </p>
+              )}
               {walletError && (
                 <p role="alert" style={{ color: "var(--color-error)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
                   {walletError}
+                </p>
+              )}
+              {profile?.stellarPublicKey && usdcBalance !== null && (
+                <p style={{ color: "var(--color-success)", fontSize: "0.875rem", marginTop: "0.5rem" }}>
+                  Current USDC balance: <strong>{parseFloat(usdcBalance).toFixed(2)} USDC</strong>
                 </p>
               )}
             </div>
