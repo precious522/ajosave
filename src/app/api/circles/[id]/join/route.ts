@@ -5,6 +5,7 @@ import { joinCircleSchema } from "@/types/schemas";
 import { joinCircle, getCircleById } from "@/server/services/circle.service";
 import { withErrorHandler } from "@/server/middleware";
 import { verifyInviteToken } from "@/lib/tokens";
+import { checkReputationGate } from "@/server/services/reputation.service";
 import type { ApiResponse, Member } from "@/types";
 
 export const POST = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
@@ -56,6 +57,20 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
     const decoded = await verifyInviteToken(token);
     if (decoded && decoded.circleId === params.id) {
       isInvited = true;
+    }
+  }
+
+  // Check reputation gate if circle has minimum reputation requirement
+  if (circle.minReputation && circle.minReputation > 0) {
+    const { eligible, currentScore } = await checkReputationGate(userId, circle.minReputation);
+    if (!eligible) {
+      return NextResponse.json<ApiResponse<never>>(
+        {
+          success: false,
+          error: `This circle requires a minimum reputation score of ${circle.minReputation}. Your current score is ${currentScore}.`,
+        },
+        { status: 403 }
+      );
     }
   }
 

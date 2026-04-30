@@ -79,4 +79,17 @@ export async function confirmContributionFromDispute(
      WHERE id = $3`,
     [disputeId, txHash, contributionId]
   );
+
+  // Get user ID from contribution and increment reputation
+  const { rows } = await query<{ user_id: string }>(
+    `SELECT m.user_id FROM contributions c
+     JOIN members m ON m.id = c.member_id
+     WHERE c.id = $1`,
+    [contributionId]
+  );
+
+  if (rows[0]?.user_id) {
+    const { incrementReputationOnContribution } = await import("./reputation.service");
+    await incrementReputationOnContribution(rows[0].user_id);
+  }
 }

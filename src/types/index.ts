@@ -24,19 +24,21 @@ export interface Circle {
   id: string;
   name: string;
   creatorId: string;
-  contributionUsdc: string;   // per-member per-cycle amount
-  contributionFiat: number;   // renamed from contributionNgn
+  contributionUsdc: string; // per-member per-cycle amount
+  contributionFiat: number; // renamed from contributionNgn
   contributionCurrency: SupportedCurrency;
   circleType: CircleType;
   maxMembers: number;
   cycleFrequency: CycleFrequency;
   payoutMethod: PayoutMethod;
   randomizationSeed?: string; // stored seed for verifiability
+  gracePeriodHours: number;   // hours after cycle start before member is marked defaulted
   status: CircleStatus;
-  contractId?: string;        // deployed Soroban circle contract
-  currentCycle: number;       // 1-indexed
-  memberCount?: number;       // calculated field
+  contractId?: string; // deployed Soroban circle contract
+  currentCycle: number; // 1-indexed
+  memberCount?: number; // calculated field
   nextPayoutAt?: Date;
+  minReputation?: number; // minimum reputation score required to join (0-100)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,11 +50,11 @@ export interface Member {
   id: string;
   circleId: string;
   userId: string;
-  position: number | null;    // payout order (1 = first to receive), null for pending members
+  position: number | null; // payout order (1 = first to receive), null for pending members
   status: MemberStatus;
   hasReceivedPayout: boolean;
   joinedAt: Date;
-  reviewedAt?: Date;          // when creator approved/rejected the request
+  reviewedAt?: Date; // when creator approved/rejected the request
 }
 
 // ─── Contribution ─────────────────────────────────────────────────────────────
@@ -86,9 +88,9 @@ export interface CircleMessage {
   id: string;
   circleId: string;
   userId: string;
-  displayName: string;  // joined from users table at read time
+  displayName: string; // joined from users table at read time
   content: string;
-  createdAt: string;    // ISO 8601 string
+  createdAt: string; // ISO 8601 string
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────

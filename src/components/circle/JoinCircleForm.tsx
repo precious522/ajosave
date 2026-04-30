@@ -20,7 +20,7 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stellarPublicKey, setStellarPublicKey] = useState("");
-  const [noSavedKey, setNoSavedKey] = useState(false);
+  const [optimisticCount, setOptimisticCount] = useState(circle.memberCount ?? 0);
 
   const { connectionState, publicKey, error: walletError, connect, disconnect } = useFreighterWallet();
 
@@ -54,6 +54,9 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
     setLoading(true);
     setError(null);
 
+    // Optimistic update: increment member count immediately
+    setOptimisticCount((c) => c + 1);
+
     try {
       const res = await fetch(`/api/circles/${circle.id}/join`, {
         method: "POST",
@@ -70,6 +73,8 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
       router.push(`/circles/${circle.id}?joined=true`);
       router.refresh();
     } catch (err) {
+      // Revert optimistic update on error
+      setOptimisticCount((c) => c - 1);
       setError(err instanceof Error ? err.message : "Failed to join circle");
     } finally {
       setLoading(false);
@@ -96,6 +101,10 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
           <div className={styles.stat}>
             <span className={styles.statLabel}>Frequency</span>
             <span className={styles.statValue}>{circle.cycleFrequency}</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.statLabel}>Members</span>
+            <span className={styles.statValue}>{optimisticCount} / {circle.maxMembers}</span>
           </div>
         </div>
       </div>
@@ -141,7 +150,11 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
           )}
         </div>
 
-        {error && <div className={styles.error}>{error}</div>}
+        {error && (
+          <div role="alert" className={styles.toast}>
+            {error}
+          </div>
+        )}
 
         <Button
           type="submit"
