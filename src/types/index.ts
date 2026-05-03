@@ -41,6 +41,7 @@ export interface Circle {
   minReputation?: number; // minimum reputation score required to join (0-100)
   createdAt: Date;
   updatedAt: Date;
+  deletedAt?: Date | null; // soft delete timestamp
 }
 
 // ─── Membership ───────────────────────────────────────────────────────────────

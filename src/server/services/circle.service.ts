@@ -28,7 +28,8 @@ const CIRCLE_SELECT = `
   (SELECT COUNT(*)::int FROM members WHERE circle_id = circles.id AND status = 'active') as "memberCount",
   next_payout_at as "nextPayoutAt", 
   created_at as "createdAt", 
-  updated_at as "updatedAt"
+  updated_at as "updatedAt",
+  deleted_at as "deletedAt"
 `;
 
 const MEMBER_SELECT = `
@@ -66,7 +67,7 @@ export async function createCircle(
 
 export async function getCircleById(id: string): Promise<Circle | null> {
   const { rows } = await query<Circle>(
-    `SELECT ${CIRCLE_SELECT} FROM circles WHERE id = $1`,
+    `SELECT ${CIRCLE_SELECT} FROM circles WHERE id = $1 AND deleted_at IS NULL`,
     [id]
   );
   return rows[0] ?? null;
@@ -96,8 +97,8 @@ export async function listOpenCircles(
   const safeLimit = Math.min(100, Math.max(1, limit));
   const offset = (safePage - 1) * safeLimit;
 
-  let queryText = `SELECT ${CIRCLE_SELECT} FROM circles WHERE status = 'open'`;
-  let countQueryText = "SELECT COUNT(*) FROM circles WHERE status = 'open'";
+  let queryText = `SELECT ${CIRCLE_SELECT} FROM circles WHERE status = 'open' AND deleted_at IS NULL`;
+  let countQueryText = "SELECT COUNT(*) FROM circles WHERE status = 'open' AND deleted_at IS NULL";
   const queryParams: any[] = [];
   let paramIndex = 1;
 
@@ -165,7 +166,7 @@ export async function getCirclesByUser(userId: string): Promise<Circle[]> {
         c.updated_at as "updatedAt"
      FROM circles c
      LEFT JOIN members m ON m.circle_id = c.id
-     WHERE c.creator_id = $1 OR m.user_id = $1
+     WHERE (c.creator_id = $1 OR m.user_id = $1) AND c.deleted_at IS NULL
      ORDER BY c.created_at DESC`,
     [userId]
   );
@@ -602,4 +603,19 @@ export async function leaveCircle(
       );
     }
   });
+}
+
+/**
+ * Soft-delete a circle by setting deleted_at.
+ * Only the creator or an admin can delete. Deleted circles are hidden from all
+ * public queries but remain in the database for historical reference.
+ */
+export async function deleteCircle(circleId: string, requesterId: string, isAdmin = false): Promise<void> {
+  const { rows } = await query<{ creator_id: string }>(
+    "SELECT creator_id FROM circles WHERE id = $1 AND deleted_at IS NULL",
+    [circleId]
+  );
+  if (!rows[0]) throw new Error("Circle not found");
+  if (!isAdmin && rows[0].creator_id !== requesterId) throw new Error("Only the creator can delete this circle");
+  await query("UPDATE circles SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1", [circleId]);
 }

@@ -12,8 +12,9 @@ export interface AdminPayoutRow extends Payout {
 
 /**
  * List all circles with their current member count.
+ * Pass includeDeleted=true to also return soft-deleted circles.
  */
-export async function adminListCircles(): Promise<AdminCircleRow[]> {
+export async function adminListCircles(includeDeleted = false): Promise<AdminCircleRow[]> {
   const { rows } = await query<AdminCircleRow>(
     `SELECT
        c.id, c.name, c.creator_id as "creatorId",
@@ -28,9 +29,11 @@ export async function adminListCircles(): Promise<AdminCircleRow[]> {
        c.next_payout_at as "nextPayoutAt",
        c.created_at as "createdAt",
        c.updated_at as "updatedAt",
+       c.deleted_at as "deletedAt",
        COUNT(m.id)::int AS "memberCount"
      FROM circles c
      LEFT JOIN members m ON m.circle_id = c.id
+     ${includeDeleted ? "" : "WHERE c.deleted_at IS NULL"}
      GROUP BY c.id
      ORDER BY c.created_at DESC`
   );
