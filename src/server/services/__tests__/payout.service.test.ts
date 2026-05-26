@@ -38,7 +38,7 @@ jest.mock("@/server/services/payout-lock", () => ({
 
 const CIRCLE_ID = "circle-1";
 // Valid Stellar Ed25519 public key
-const RECIPIENT_KEY = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN";
+const RECIPIENT_KEY = "GCBVPTGYLOELZOOOLS4W765VOL3CCXWCTTTGWIYSAFPRLJLRG6VWAEB5";
 const TX_HASH = "abc123txhash";
 
 const USDC_BALANCE = {

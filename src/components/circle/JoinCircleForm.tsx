@@ -21,6 +21,8 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [stellarPublicKey, setStellarPublicKey] = useState("");
   const [optimisticCount, setOptimisticCount] = useState(circle.memberCount ?? 0);
+  const [noSavedKey, setNoSavedKey] = useState(false);
+  const [hasUsdcTrustline, setHasUsdcTrustline] = useState<boolean | null>(null);
 
   const { connectionState, publicKey, error: walletError, connect, disconnect } = useFreighterWallet();
 
@@ -46,6 +48,21 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
       setStellarPublicKey("");
     }
   }, [connectionState]);
+
+  useEffect(() => {
+    if (!stellarPublicKey || !/^G[A-Z2-7]{55}$/.test(stellarPublicKey)) {
+      setHasUsdcTrustline(null);
+      return;
+    }
+    fetch(`/api/stellar/balance?publicKey=${encodeURIComponent(stellarPublicKey)}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) {
+          setHasUsdcTrustline(json.data.hasTrustline);
+        }
+      })
+      .catch(() => {});
+  }, [stellarPublicKey]);
 
   const currencySymbol = getCurrencySymbol(circle.contributionCurrency as SupportedCurrency);
 
@@ -147,6 +164,11 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
             <p role="alert" style={{ color: "var(--color-error)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
               {walletError}
             </p>
+          )}
+          {stellarPublicKey && /^G[A-Z2-7]{55}$/.test(stellarPublicKey) && hasUsdcTrustline === false && (
+            <div role="alert" style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid var(--color-error)", borderRadius: "var(--radius-md)", padding: "var(--space-3) var(--space-4)", marginTop: "0.5rem", fontSize: "0.875rem", color: "var(--color-error)" }}>
+              ⚠️ <strong>Missing USDC Trustline:</strong> The entered Stellar account does not have a USDC trustline. Payouts sent to this account will fail. Please add a USDC trustline before joining.
+            </div>
           )}
         </div>
 

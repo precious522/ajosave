@@ -15,7 +15,7 @@ jest.mock("@/server/config", () => ({
     stellar: {
       horizonUrl: "https://horizon-testnet.stellar.org",
       network: "testnet",
-      serverSecretKey: "SDY6E7SDXN2D574GNYE3R5TNSV5C6S6X6S6X6S6X6S6X6S6X6S6X", // Mock key
+      serverSecretKey: "SA3JUJWMEM6TJAAFUZDARKE4WFJHWJKEDU6CW4AULPRNU6VL7PPXKVMZ", // Mock key
     },
     usdc: {
       assetCode: "USDC",
@@ -25,7 +25,7 @@ jest.mock("@/server/config", () => ({
 }));
 
 describe("sendUsdcPayment retry logic", () => {
-  const destination = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN";
+  const destination = "GCBVPTGYLOELZOOOLS4W765VOL3CCXWCTTTGWIYSAFPRLJLRG6VWAEB5";
   const amount = "10.0000000";
 
   beforeEach(() => {
@@ -41,7 +41,8 @@ describe("sendUsdcPayment retry logic", () => {
   it("succeeds on the first attempt", async () => {
     const mockAccount = {
       sequenceNumber: () => "1",
-      publicKey: () => "G...",
+      accountId: () => "GCBVPTGYLOELZOOOLS4W765VOL3CCXWCTTTGWIYSAFPRLJLRG6VWAEB5",
+      incrementSequenceNumber: () => {},
     };
     (horizonServer.loadAccount as jest.Mock) = jest.fn().mockResolvedValue(mockAccount);
     (horizonServer.submitTransaction as jest.Mock) = jest.fn().mockResolvedValue({ hash: "success-hash" });
@@ -57,7 +58,8 @@ describe("sendUsdcPayment retry logic", () => {
   it("retries on transient failure and eventually succeeds", async () => {
     const mockAccount = {
       sequenceNumber: () => "1",
-      publicKey: () => "G...",
+      accountId: () => "GCBVPTGYLOELZOOOLS4W765VOL3CCXWCTTTGWIYSAFPRLJLRG6VWAEB5",
+      incrementSequenceNumber: () => {},
     };
     (horizonServer.loadAccount as jest.Mock) = jest.fn().mockResolvedValue(mockAccount);
     
@@ -88,7 +90,8 @@ describe("sendUsdcPayment retry logic", () => {
   it("stops retrying on fatal error (tx_bad_seq)", async () => {
     const mockAccount = {
       sequenceNumber: () => "1",
-      publicKey: () => "G...",
+      accountId: () => "GCBVPTGYLOELZOOOLS4W765VOL3CCXWCTTTGWIYSAFPRLJLRG6VWAEB5",
+      incrementSequenceNumber: () => {},
     };
     (horizonServer.loadAccount as jest.Mock) = jest.fn().mockResolvedValue(mockAccount);
     
@@ -114,7 +117,8 @@ describe("sendUsdcPayment retry logic", () => {
   it("exhausts retries on persistent transient failures", async () => {
     const mockAccount = {
       sequenceNumber: () => "1",
-      publicKey: () => "G...",
+      accountId: () => "GCBVPTGYLOELZOOOLS4W765VOL3CCXWCTTTGWIYSAFPRLJLRG6VWAEB5",
+      incrementSequenceNumber: () => {},
     };
     (horizonServer.loadAccount as jest.Mock) = jest.fn().mockResolvedValue(mockAccount);
     
@@ -124,13 +128,14 @@ describe("sendUsdcPayment retry logic", () => {
     (horizonServer.submitTransaction as jest.Mock) = jest.fn().mockRejectedValue(errorTimeout);
 
     const promise = sendUsdcPayment(destination, amount);
+    const assertion = expect(promise).rejects.toThrow("Network timeout");
     
     // Run all retries
     for (let i = 0; i < 3; i++) {
       await jest.runAllTimersAsync();
     }
     
-    await expect(promise).rejects.toThrow("Network timeout");
+    await assertion;
     
     // Initial + 3 retries = 4 attempts
     expect(horizonServer.loadAccount).toHaveBeenCalledTimes(4);
