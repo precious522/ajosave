@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { listOpenCircles } from "@/server/services/circle.service";
 import { CircleCard } from "@/components/circle/CircleCard";
 import { CircleFilters } from "@/components/circle/CircleFilters";
+import { EmptyState } from "@/components/ui/EmptyState";
 import Link from "next/link";
 import styles from "./page.module.css";
 
@@ -30,6 +31,8 @@ export default async function CirclesPage({ searchParams }: Props) {
     currency: searchParams.currency,
   });
 
+  const hasFilters = !!(searchParams.search || searchParams.frequency || searchParams.minAmount || searchParams.maxAmount || searchParams.status || searchParams.currency);
+
   return (
     <div className={styles.page}>
       <div className="container">
@@ -43,10 +46,22 @@ export default async function CirclesPage({ searchParams }: Props) {
         <CircleFilters />
 
         {circles.length === 0 ? (
-          <div className={styles.empty}>
-            <p>No circles found matching your criteria.</p>
-            <Link href="/circles" className="btn btn--secondary">Clear all filters</Link>
-          </div>
+          <EmptyState
+            illustration={hasFilters ? "search" : "circles"}
+            title={hasFilters ? "No circles match your filters" : "No open circles yet"}
+            description={
+              hasFilters
+                ? "Try adjusting your search or filters to find what you're looking for."
+                : "Be the first to start a savings circle and invite others to join."
+            }
+            ctas={
+              hasFilters
+                ? [{ label: "Clear all filters", href: "/circles", variant: "secondary" }]
+                : [
+                    { label: "Create a circle", href: "/circles/create", variant: "primary" },
+                  ]
+            }
+          />
         ) : (
           <div className={styles.grid}>
             {circles.map((circle) => (
