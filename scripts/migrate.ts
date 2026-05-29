@@ -30,7 +30,7 @@ runner({
     console.log(`Migrations (${direction}) complete`);
     process.exit(0);
   })
-  .catch((err: unknown) => {
+  .catch((err: Error) => {
     console.error("Migration failed:", err);
     process.exit(1);
   });

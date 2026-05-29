@@ -6,8 +6,8 @@
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #ffffff;
-  background-color: #4f46e5;
+  color: #fff;
+  background-color: var(--color-brand-primary);
   border: none;
   border-radius: 0.375rem;
   cursor: pointer;
@@ -15,11 +15,11 @@
 }
 
 .connectButton:hover:not(:disabled) {
-  background-color: #4338ca;
+  background-color: var(--color-brand-primary-hover);
 }
 
 .connectButton:focus-visible {
-  outline: 2px solid #4f46e5;
+  outline: 2px solid var(--color-brand-primary);
   outline-offset: 2px;
 }
 
@@ -31,9 +31,9 @@
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #9ca3af;
-  background-color: #e5e7eb;
-  border: none;
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
   border-radius: 0.375rem;
   cursor: not-allowed;
 }
@@ -43,7 +43,7 @@
   display: inline-block;
   width: 0.875rem;
   height: 0.875rem;
-  border: 2px solid #9ca3af;
+  border: 2px solid var(--color-text-muted);
   border-top-color: transparent;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
@@ -60,6 +60,6 @@
 .statusMessage {
   margin: 0 0 0.5rem 0;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-family: monospace;
 }

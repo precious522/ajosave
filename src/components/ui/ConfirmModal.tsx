@@ -61,10 +61,22 @@ export function ConfirmModal({
         <h2 id="confirm-title" className={styles.title}>{title}</h2>
         <p id="confirm-message" className={styles.message}>{message}</p>
         <div className={styles.actions}>
-          <button ref={cancelRef} className="btn btn--secondary" onClick={onCancel} disabled={loading} aria-label={cancelLabel}>
+          <Button
+            ref={cancelRef}
+            variant="secondary"
+            onClick={onCancel}
+            disabled={loading}
+            aria-label={cancelLabel}
+          >
             {cancelLabel}
-          </button>
-          <Button variant="primary" onClick={onConfirm} loading={loading} className={styles.confirmBtn} aria-label={confirmLabel}>
+          </Button>
+          <Button
+            variant="primary"
+            onClick={onConfirm}
+            loading={loading}
+            className={styles.confirmBtn}
+            aria-label={confirmLabel}
+          >
             {confirmLabel}
           </Button>
         </div>

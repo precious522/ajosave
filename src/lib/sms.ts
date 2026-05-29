@@ -109,10 +109,18 @@ export async function sendCircleCancelledNoRefundSms(
   await sendSms(phone, message);
 }
 
-export async function sendWaitlistSpotOpenedSms(
+export async function sendCirclePausedSms(
   phone: string,
   circleName: string
 ): Promise<void> {
-  const message = `Ajosave: A spot has opened up in "${circleName}"! Since you are on the waitlist, you can now join. Visit your dashboard to secure your spot now!`;
+  const message = `Ajosave: The circle "${circleName}" has been paused by the creator. Future payouts are temporarily suspended. You'll be notified when it resumes.`;
+  await sendSms(phone, message);
+}
+
+export async function sendCircleResumedSms(
+  phone: string,
+  circleName: string
+): Promise<void> {
+  const message = `Ajosave: The circle "${circleName}" has been resumed. Normal schedule and payouts have been restored.`;
   await sendSms(phone, message);
 }

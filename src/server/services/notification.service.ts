@@ -9,7 +9,8 @@ import {
   sendJoinRequestRejectedSms,
   sendCircleCancelledSms,
   sendCircleCancelledNoRefundSms,
-  sendWaitlistSpotOpenedSms,
+  sendCirclePausedSms,
+  sendCircleResumedSms,
 } from "@/lib/sms";
 import type { User } from "@/types";
 
@@ -243,20 +244,41 @@ export async function notifyCircleCancelled(
 }
 
 /**
- * Notify a waitlisted user that a spot in the circle has opened up.
+ * Notify all circle members when the circle is paused
  */
-export async function notifyWaitlistSpotOpened(
-  userId: string,
+export async function notifyCirclePaused(
+  memberUserIds: string[],
   circleName: string
 ): Promise<void> {
-  if (!(await canSendSms(userId))) return;
+  const notifications = memberUserIds.map(async (userId) => {
+    if (!(await canSendSms(userId))) return;
+    const phone = await getUserPhone(userId);
+    if (!phone) return;
+    try {
+      await sendCirclePausedSms(phone, circleName);
+    } catch (error) {
+      console.error(`Failed to send pause notification to ${userId}:`, error);
+    }
+  });
+  await Promise.allSettled(notifications);
+}
 
-  const phone = await getUserPhone(userId);
-  if (!phone) return;
-
-  try {
-    await sendWaitlistSpotOpenedSms(phone, circleName);
-  } catch (error) {
-    console.error(`Failed to send waitlist spot opened SMS to ${userId}:`, error);
-  }
+/**
+ * Notify all circle members when the circle is resumed
+ */
+export async function notifyCircleResumed(
+  memberUserIds: string[],
+  circleName: string
+): Promise<void> {
+  const notifications = memberUserIds.map(async (userId) => {
+    if (!(await canSendSms(userId))) return;
+    const phone = await getUserPhone(userId);
+    if (!phone) return;
+    try {
+      await sendCircleResumedSms(phone, circleName);
+    } catch (error) {
+      console.error(`Failed to send resume notification to ${userId}:`, error);
+    }
+  });
+  await Promise.allSettled(notifications);
 }

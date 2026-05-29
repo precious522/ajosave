@@ -14,7 +14,7 @@ interface Props {
 
 export function CircleActions({ circleId, isCreator, isMember, status }: Props) {
   const router = useRouter();
-  const [modal, setModal] = useState<"cancel" | "leave" | null>(null);
+  const [modal, setModal] = useState<"cancel" | "leave" | "pause" | "resume" | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inviteCopied, setInviteCopied] = useState(false);
@@ -69,10 +69,44 @@ export function CircleActions({ circleId, isCreator, isMember, status }: Props) 
     }
   };
 
-  const canCancel = isCreator && (status === "open" || status === "active");
-  const canLeave = isMember && !isCreator && status === "open";
+  const handlePause = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/pause`, { method: "POST" });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to pause circle");
+    } finally {
+      setLoading(false);
+      setModal(null);
+    }
+  };
 
-  if (!canCancel && !canLeave) return null;
+  const handleResume = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/resume`, { method: "POST" });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resume circle");
+    } finally {
+      setLoading(false);
+      setModal(null);
+    }
+  };
+
+  const canCancel = isCreator && (status === "open" || status === "active" || status === "paused");
+  const canLeave = isMember && !isCreator && status === "open";
+  const canPause = isCreator && status === "active";
+  const canResume = isCreator && status === "paused";
+
+  if (!canCancel && !canLeave && !canPause && !canResume) return null;
 
   return (
     <>
@@ -90,6 +124,16 @@ export function CircleActions({ circleId, isCreator, isMember, status }: Props) 
         {canLeave && (
           <Button variant="ghost" size="sm" onClick={() => setModal("leave")}>
             Leave Circle
+          </Button>
+        )}
+        {canPause && (
+          <Button variant="ghost" size="sm" onClick={() => setModal("pause")}>
+            Pause Circle
+          </Button>
+        )}
+        {canResume && (
+          <Button variant="primary" size="sm" onClick={() => setModal("resume")}>
+            Resume Circle
           </Button>
         )}
         {canCancel && (
@@ -118,6 +162,26 @@ export function CircleActions({ circleId, isCreator, isMember, status }: Props) 
         confirmLabel="Yes, Leave Circle"
         loading={loading}
         onConfirm={handleLeave}
+        onCancel={() => setModal(null)}
+      />
+
+      <ConfirmModal
+        open={modal === "pause"}
+        title="Pause Circle"
+        message="Are you sure you want to pause this circle? Future payouts will be temporarily suspended and members will be notified."
+        confirmLabel="Yes, Pause Circle"
+        loading={loading}
+        onConfirm={handlePause}
+        onCancel={() => setModal(null)}
+      />
+
+      <ConfirmModal
+        open={modal === "resume"}
+        title="Resume Circle"
+        message="Are you sure you want to resume this circle? Normal schedule and payouts will be restored."
+        confirmLabel="Yes, Resume Circle"
+        loading={loading}
+        onConfirm={handleResume}
         onCancel={() => setModal(null)}
       />
     </>

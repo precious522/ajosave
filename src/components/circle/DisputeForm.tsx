@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 import styles from "./DisputeForm.module.css";
 
 interface DisputeFormProps {
@@ -76,21 +78,25 @@ export function DisputeForm({ circleId, contributionId, memberId, onSuccess }: D
         <label htmlFor="paystack" className={styles.label}>
           Paystack Reference (optional)
         </label>
-        <input
+        <Input
           id="paystack"
           type="text"
           value={paystackRef}
           onChange={(e) => setPaystackRef(e.target.value)}
           placeholder="e.g., 1234567890"
-          className={styles.input}
         />
       </div>
 
-      {error && <div className={styles.error}>{error}</div>}
+      {error && <div className={styles.error} role="alert">{error}</div>}
 
-      <button type="submit" disabled={loading || !reason.trim()} className={styles.submit}>
-        {loading ? "Submitting..." : "Submit Dispute"}
-      </button>
+      <Button
+        type="submit"
+        disabled={loading || !reason.trim()}
+        loading={loading}
+        className={styles.submit}
+      >
+        Submit Dispute
+      </Button>
     </form>
   );
 }
