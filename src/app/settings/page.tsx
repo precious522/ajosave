@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/Button";
+import { DeleteAccountButton } from "@/components/ui/DeleteAccountButton";
 import styles from "./page.module.css";
 
 export default function SettingsPage() {
@@ -71,23 +72,27 @@ export default function SettingsPage() {
             </div>
             
             <div className={styles.settingControl}>
-              <label className={styles.toggle}>
+              <label className={styles.toggle} aria-label={`SMS notifications: ${smsEnabled ? "enabled" : "disabled"}`}>
                 <input
                   type="checkbox"
                   checked={smsEnabled}
                   onChange={handleToggleSms}
                   disabled={loading}
+                  aria-checked={smsEnabled}
                 />
-                <span className={styles.slider}></span>
+                <span className={styles.slider} aria-hidden="true"></span>
               </label>
-              <span className={styles.status}>
+              <span className={styles.status} aria-live="polite">
                 {smsEnabled ? "Enabled" : "Disabled"}
               </span>
             </div>
           </div>
 
           {message && (
-            <div className={`${styles.message} ${styles[message.type]}`}>
+            <div
+              className={`${styles.message} ${styles[message.type]}`}
+              role="alert"
+            >
               {message.text}
             </div>
           )}
@@ -116,6 +121,14 @@ export default function SettingsPage() {
               <span className={styles.infoLabel}>Display Name</span>
               <span className={styles.infoValue}>{session.user?.name || "Not set"}</span>
             </div>
+          </div>
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Danger Zone</h2>
+          <p className={styles.settingDesc}>Permanently delete your account and all data.</p>
+          <div style={{ marginTop: "var(--space-4)" }}>
+            <DeleteAccountButton />
           </div>
         </section>
       </div>

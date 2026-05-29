@@ -18,7 +18,7 @@ jest.mock("@/lib/fx");
 const mockQuery = db.query as jest.MockedFunction<typeof db.query>;
 const mockTransaction = db.transaction as jest.MockedFunction<typeof db.transaction>;
 const mockDeployAjoContract = soroban.deployAjoContract as jest.MockedFunction<typeof soroban.deployAjoContract>;
-const mockGetNgnPerUsdc = fx.getNgnPerUsdc as jest.MockedFunction<typeof fx.getNgnPerUsdc>;
+const mockGetFiatPerUsdc = fx.getFiatPerUsdc as jest.MockedFunction<typeof fx.getFiatPerUsdc>;
 
 const CIRCLE_ID = "circle-123";
 const USER_ID = "user-456";
@@ -29,7 +29,8 @@ const MOCK_CIRCLE = {
   name: "Test Circle",
   creatorId: CREATOR_ID,
   contributionUsdc: "10.0000000",
-  contributionNgn: 16000,
+  contributionFiat: 16000,
+  contributionCurrency: "NGN",
   maxMembers: 3,
   cycleFrequency: "monthly",
   payoutMethod: "fixed",
@@ -48,7 +49,7 @@ const MOCK_MEMBER = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGetNgnPerUsdc.mockResolvedValue(1600);
+  mockGetFiatPerUsdc.mockResolvedValue(1600);
   mockTransaction.mockImplementation(async (cb) => cb(mockQuery));
 });
 
@@ -56,7 +57,8 @@ describe("circle.service", () => {
   describe("createCircle", () => {
     const input = {
       name: "New Circle",
-      contributionNgn: 16000,
+      contributionAmount: 16000,
+      contributionCurrency: "NGN" as const,
       maxMembers: 5,
       cycleFrequency: "monthly" as const,
       payoutMethod: "fixed" as const,
@@ -152,6 +154,22 @@ describe("circle.service", () => {
       expect(mockQuery).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO members"),
         expect.arrayContaining(["pending"])
+      );
+    });
+
+    it("should auto-approve invited users for private circles", async () => {
+      const privateCircle = { ...MOCK_CIRCLE, circleType: "private" };
+      mockQuery
+        .mockResolvedValueOnce({ rows: [privateCircle], rowCount: 1 } as any)
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 } as any)
+        .mockResolvedValueOnce({ rows: [{ ...MOCK_MEMBER, status: "active" }], rowCount: 1 } as any);
+
+      const result = await joinCircle(CIRCLE_ID, USER_ID, true);
+
+      expect(result.status).toBe("active");
+      expect(mockQuery).toHaveBeenCalledWith(
+        expect.stringContaining("INSERT INTO members"),
+        expect.arrayContaining(["active"])
       );
     });
 

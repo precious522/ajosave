@@ -66,13 +66,13 @@ const FEATURES = [
   { icon: "💵", title: "Stable in USDC", desc: "Contributions are held in USDC so the pot value never changes between the first and last payout." },
   { icon: "⚡", title: "Near-Zero Fees", desc: "Stellar's high-speed network means almost nothing is lost to transaction fees." },
   { icon: "📊", title: "On-Chain Reputation", desc: "Every on-time contribution builds your reputation score — unlocking access to larger circles." },
-  { icon: "🇳🇬", title: "NGN On/Off-Ramp", desc: "Contribute in Naira via Paystack. Receive payouts directly to your Nigerian bank account." },
+  { icon: "🌍", title: "Local Currency Ramps", desc: "Contribute in your local currency (NGN, GBP, EUR, USD). Receive payouts directly to your wallet." },
   { icon: "🔄", title: "Automatic Rotation", desc: "The contract handles the rotation order and payout schedule — no coordinator needed." },
 ];
 
 const STEPS = [
   { title: "Create or join a circle", desc: "Set the contribution amount, number of members, and cycle frequency — or browse open circles to join." },
-  { title: "Contribute each cycle", desc: "Pay your contribution in Naira via Paystack. It's converted to USDC and locked in the smart contract." },
+  { title: "Contribute each cycle", desc: "Pay your contribution in your local currency via Paystack. It's converted to USDC and locked in the smart contract." },
   { title: "Receive your payout", desc: "When it's your turn in the rotation, the full pot is automatically sent to your Stellar wallet." },
   { title: "Build your reputation", desc: "Every completed circle adds to your on-chain reputation score, unlocking bigger circles." },
 ];

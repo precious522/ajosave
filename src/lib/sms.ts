@@ -56,6 +56,16 @@ export async function sendMissedContributionSms(
   await sendSms(phone, message);
 }
 
+export async function sendContributionReminderSms(
+  phone: string,
+  circleName: string,
+  amount: string,
+  hoursLeft: number
+): Promise<void> {
+  const message = `Ajosave: Your contribution of ${amount} USDC to "${circleName}" is due in ${hoursLeft} hours. Please contribute now to avoid being marked as defaulted!`;
+  await sendSms(phone, message);
+}
+
 export async function sendContributionReceivedSms(
   phone: string,
   circleName: string,
@@ -79,5 +89,38 @@ export async function sendJoinRequestRejectedSms(
   circleName: string
 ): Promise<void> {
   const message = `Ajosave: Your join request for "${circleName}" has been declined by the creator.`;
+  await sendSms(phone, message);
+}
+
+export async function sendCircleCancelledSms(
+  phone: string,
+  circleName: string,
+  refundAmount: string
+): Promise<void> {
+  const message = `Ajosave: The circle "${circleName}" has been cancelled by the creator. A refund of ${refundAmount} USDC has been sent to your Stellar wallet.`;
+  await sendSms(phone, message);
+}
+
+export async function sendCircleCancelledNoRefundSms(
+  phone: string,
+  circleName: string
+): Promise<void> {
+  const message = `Ajosave: The circle "${circleName}" has been cancelled by the creator. You had no confirmed contributions, so no refund is needed.`;
+  await sendSms(phone, message);
+}
+
+export async function sendCirclePausedSms(
+  phone: string,
+  circleName: string
+): Promise<void> {
+  const message = `Ajosave: The circle "${circleName}" has been paused by the creator. Future payouts are temporarily suspended. You'll be notified when it resumes.`;
+  await sendSms(phone, message);
+}
+
+export async function sendCircleResumedSms(
+  phone: string,
+  circleName: string
+): Promise<void> {
+  const message = `Ajosave: The circle "${circleName}" has been resumed. Normal schedule and payouts have been restored.`;
   await sendSms(phone, message);
 }

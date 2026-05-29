@@ -101,9 +101,7 @@ export function stopHorizonStream(): void {
  * Auto-confirm a contribution when matching USDC payment is received
  * Matches based on amount and timing
  */
-async function autoConfirmContribution(
-  payment: ServerApi.PaymentOperationRecord
-): Promise<void> {
+async function autoConfirmContribution(payment: ServerApi.PaymentOperationRecord): Promise<void> {
   const amountUsdc = payment.amount;
   const txHash = payment.transaction_hash;
   const senderAddress = payment.from;
@@ -146,6 +144,10 @@ async function autoConfirmContribution(
      WHERE id = $2`,
     [txHash, contribution.id]
   );
+
+  // Increment user's reputation score for on-time contribution
+  const { incrementReputationOnContribution } = await import("./reputation.service");
+  await incrementReputationOnContribution(contribution.user_id);
 
   console.log(`[horizon-stream] Auto-confirmed contribution ${contribution.id}`);
 

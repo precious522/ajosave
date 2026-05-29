@@ -12,27 +12,24 @@ jest.mock("next/link", () => ({
   ),
 }));
 
-// The component accesses circle.contributionNgn at runtime even though
-// the canonical type uses contributionFiat. Cast via unknown to satisfy TS.
-const baseCircle = {
+const baseCircle: Circle = {
   id: "circle-1",
   name: "Lagos Monthly Ajo",
   creatorId: "user-1",
   contributionUsdc: "10.0000000",
-  // Runtime field the component reads
-  contributionNgn: 16_000,
-  // Type-compatible aliases
   contributionFiat: 16_000,
   contributionCurrency: "NGN",
+  circleType: "public",
   maxMembers: 5,
   cycleFrequency: "monthly",
   payoutMethod: "fixed",
-  status: "open" as CircleStatus,
+  gracePeriodHours: 24,
+  status: "open",
   currentCycle: 0,
   nextPayoutAt: undefined,
   createdAt: new Date("2025-01-01"),
   updatedAt: new Date("2025-01-01"),
-} as unknown as Circle;
+};
 
 const makeMember = (id: string): Member => ({
   id,
@@ -53,7 +50,7 @@ describe("CircleCard", () => {
 
     it("displays cycle frequency", () => {
       render(<CircleCard circle={baseCircle} members={[]} />);
-      expect(screen.getByText(/monthly/i)).toBeInTheDocument();
+      expect(screen.getByText("/ monthly")).toBeInTheDocument();
     });
 
     it("displays member count", () => {
@@ -63,10 +60,10 @@ describe("CircleCard", () => {
     });
 
     it("displays the next payout date when provided", () => {
-      const circle = {
+      const circle: Circle = {
         ...baseCircle,
         nextPayoutAt: new Date("2025-06-15"),
-      } as unknown as Circle;
+      };
       render(<CircleCard circle={circle} members={[]} />);
       expect(screen.getByText(/jun 15, 2025/i)).toBeInTheDocument();
     });
@@ -83,6 +80,33 @@ describe("CircleCard", () => {
       expect(bar).toHaveAttribute("aria-valuenow", "2");
       expect(bar).toHaveAttribute("aria-valuemax", "5");
     });
+
+    it("displays the correct currency symbol for NGN", () => {
+      render(<CircleCard circle={baseCircle} members={[]} />);
+      expect(screen.getByText(/₦/)).toBeInTheDocument();
+      expect(screen.getByText(/16,000/)).toBeInTheDocument();
+    });
+
+    it("displays the correct currency symbol for USD", () => {
+      const usdCircle: Circle = { ...baseCircle, contributionCurrency: "USD", contributionFiat: 50 };
+      render(<CircleCard circle={usdCircle} members={[]} />);
+      expect(screen.getByText(/\$/)).toBeInTheDocument();
+      expect(screen.getByText(/50/)).toBeInTheDocument();
+    });
+
+    it("displays the correct currency symbol for EUR", () => {
+      const eurCircle: Circle = { ...baseCircle, contributionCurrency: "EUR", contributionFiat: 45 };
+      render(<CircleCard circle={eurCircle} members={[]} />);
+      expect(screen.getByText(/€/)).toBeInTheDocument();
+      expect(screen.getByText(/45/)).toBeInTheDocument();
+    });
+
+    it("displays the correct currency symbol for GBP", () => {
+      const gbpCircle: Circle = { ...baseCircle, contributionCurrency: "GBP", contributionFiat: 40 };
+      render(<CircleCard circle={gbpCircle} members={[]} />);
+      expect(screen.getByText(/£/)).toBeInTheDocument();
+      expect(screen.getByText(/40/)).toBeInTheDocument();
+    });
   });
 
   describe("status badge", () => {
@@ -90,7 +114,7 @@ describe("CircleCard", () => {
 
     statuses.forEach((status) => {
       it(`renders the "${status}" status badge`, () => {
-        const circle = { ...baseCircle, status } as unknown as Circle;
+        const circle: Circle = { ...baseCircle, status };
         render(<CircleCard circle={circle} members={[]} />);
         expect(screen.getByText(status.charAt(0).toUpperCase() + status.slice(1))).toBeInTheDocument();
       });
@@ -130,20 +154,30 @@ describe("CircleCard", () => {
       expect(screen.queryByRole("link", { name: /join circle/i })).not.toBeInTheDocument();
     });
 
+    it("shows 'Circle Full — View Details / Join Waitlist' link when circle is full (spotsLeft = 0)", () => {
+      const members = [
+        makeMember("a"), makeMember("b"), makeMember("c"), makeMember("d"), makeMember("e"),
+      ];
+      render(<CircleCard circle={baseCircle} members={members} showJoin />);
+      const link = screen.getByRole("link", { name: /circle full/i });
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute("href", "/circles/circle-1");
+    });
+
     it("hides Join button when status is 'active'", () => {
-      const circle = { ...baseCircle, status: "active" as CircleStatus } as unknown as Circle;
+      const circle: Circle = { ...baseCircle, status: "active" };
       render(<CircleCard circle={circle} members={[]} showJoin />);
       expect(screen.queryByRole("link", { name: /join circle/i })).not.toBeInTheDocument();
     });
 
     it("hides Join button when status is 'completed'", () => {
-      const circle = { ...baseCircle, status: "completed" as CircleStatus } as unknown as Circle;
+      const circle: Circle = { ...baseCircle, status: "completed" };
       render(<CircleCard circle={circle} members={[]} showJoin />);
       expect(screen.queryByRole("link", { name: /join circle/i })).not.toBeInTheDocument();
     });
 
     it("hides Join button when status is 'cancelled'", () => {
-      const circle = { ...baseCircle, status: "cancelled" as CircleStatus } as unknown as Circle;
+      const circle: Circle = { ...baseCircle, status: "cancelled" };
       render(<CircleCard circle={circle} members={[]} showJoin />);
       expect(screen.queryByRole("link", { name: /join circle/i })).not.toBeInTheDocument();
     });

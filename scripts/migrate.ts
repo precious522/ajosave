@@ -1,5 +1,9 @@
-import runner from "node-pg-migrate";
+import { runner } from "node-pg-migrate";
 import path from "path";
+import pkg from "@next/env";
+const { loadEnvConfig } = pkg;
+
+loadEnvConfig(process.cwd());
 
 const direction = (process.argv[2] ?? "up") as "up" | "down";
 
@@ -20,13 +24,13 @@ runner({
   direction,
   migrationsTable: "pgmigrations",
   count: direction === "down" ? 1 : Infinity,
-  log: (msg) => console.log(msg),
+  log: (msg: string) => console.log(msg),
 })
   .then(() => {
     console.log(`Migrations (${direction}) complete`);
     process.exit(0);
   })
-  .catch((err) => {
+  .catch((err: Error) => {
     console.error("Migration failed:", err);
     process.exit(1);
   });

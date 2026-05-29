@@ -6,6 +6,7 @@ import { CircleStatusBadge } from "@/components/ui/CircleStatusBadge";
 import { Button } from "@/components/ui/Button";
 import { CopyableText } from "@/components/ui/CopyableText";
 import { format } from "date-fns";
+import { getCurrencySymbol, SupportedCurrency } from "@/lib/currency";
 import styles from "../admin.module.css";
 
 interface CirclesTableProps {
@@ -16,6 +17,8 @@ export function CirclesTable({ circles }: CirclesTableProps) {
   const [payingOut, setPayingOut] = useState<string | null>(null);
   const [payoutError, setPayoutError] = useState<string | null>(null);
   const [payoutSuccess, setPayoutSuccess] = useState<{ message: string; txHash: string } | null>(null);
+
+  const getCircleCurrencySymbol = (currency: string) => getCurrencySymbol(currency as SupportedCurrency);
 
   const handleManualPayout = async (circleId: string) => {
     setPayingOut(circleId);
@@ -79,7 +82,10 @@ export function CirclesTable({ circles }: CirclesTableProps) {
                   <CircleStatusBadge status={circle.status} />
                 </td>
                 <td>{circle.memberCount} / {circle.maxMembers}</td>
-                <td>₦{circle.contributionNgn.toLocaleString("en-NG")}</td>
+                <td>
+                  {getCircleCurrencySymbol(circle.contributionCurrency)}
+                  {circle.contributionFiat.toLocaleString()}
+                </td>
                 <td>{circle.currentCycle > 0 ? `#${circle.currentCycle}` : "—"}</td>
                 <td>
                   {circle.nextPayoutAt

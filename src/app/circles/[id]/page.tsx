@@ -4,8 +4,14 @@ import { authOptions } from "@/lib/auth";
 import { getCircleById, getMembersByCircle } from "@/server/services/circle.service";
 import { CircleStatusBadge } from "@/components/ui/CircleStatusBadge";
 import { MemberPayoutList } from "@/components/circle/MemberPayoutList";
+import { CircleActions } from "@/components/circle/CircleActions";
+import { PayoutCountdown } from "@/components/circle/PayoutCountdown";
+import { PayoutHistory } from "@/components/circle/PayoutHistory";
+import { getCurrencySymbol, SupportedCurrency } from "@/lib/currency";
 import { format } from "date-fns";
 import type { Metadata } from "next";
+import { CircleChat } from "@/components/circle/CircleChat";
+import { CircleWaitlist } from "@/components/circle/CircleWaitlist";
 import styles from "./page.module.css";
 
 interface Props {
@@ -14,9 +20,33 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const circle = await getCircleById(params.id);
-  return { title: circle?.name ?? "Circle" };
+  if (!circle) return { title: "Circle Not Found" };
+
+  const symbol = getCurrencySymbol(circle.contributionCurrency as SupportedCurrency);
+  const title = `${circle.name} | Ajosave`;
+  const description = `Join ${circle.name} — a savings circle with ${symbol}${circle.contributionFiat.toLocaleString()} contributions every ${circle.cycleFrequency}. Powered by Stellar.`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `https://www.ajosave.app/circles/${params.id}`,
+      siteName: "Ajosave",
+      type: "website",
+      images: [{ url: "/og-default.svg", width: 1200, height: 630, alt: title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["/og-default.svg"],
+    },
+  };
 }
 
+// CircleDetailPage
 export default async function CircleDetailPage({ params }: Props) {
   const [circle, members, session] = await Promise.all([
     getCircleById(params.id),
@@ -28,6 +58,19 @@ export default async function CircleDetailPage({ params }: Props) {
 
   const userId = (session?.user as { id?: string } | undefined)?.id;
   const isCreator = userId === circle.creatorId;
+  const isMember = members.some((m) => m.userId === userId);
+  const isActiveMember = members.some((m) => m.userId === userId && m.status === "active");
+  const currencySymbol = getCurrencySymbol(circle.contributionCurrency as SupportedCurrency);
+
+  // Load waitlist status for this user
+  let isOnWaitlist = false;
+  let waitlistPosition: number | null = null;
+  if (userId) {
+    const { getWaitlistStatus } = await import("@/server/services/waitlist.service");
+    const status = await getWaitlistStatus(circle.id, userId);
+    isOnWaitlist = status.isOnWaitlist;
+    waitlistPosition = status.position;
+  }
 
   return (
     <div className={styles.page}>
@@ -37,19 +80,44 @@ export default async function CircleDetailPage({ params }: Props) {
             <h1 className={styles.title}>{circle.name}</h1>
             <CircleStatusBadge status={circle.status} />
           </div>
+          {userId && (
+            <CircleActions
+              circleId={circle.id}
+              isCreator={isCreator}
+              isMember={isMember}
+              status={circle.status}
+            />
+          )}
         </div>
 
         <div className={styles.grid}>
+          <div className="card" style={{ gridColumn: "1 / -1" }}>
+            <h2 className={styles.sectionTitle}>Payout History</h2>
+            <PayoutHistory circleId={circle.id} />
+          </div>
+
           <div className="card">
             <h2 className={styles.sectionTitle}>Circle Details</h2>
+            
+            {circle.nextPayoutAt && circle.status === "active" && (
+              <div style={{ marginBottom: "var(--space-6)" }}>
+                <PayoutCountdown nextPayoutAt={circle.nextPayoutAt} />
+              </div>
+            )}
+
             <dl className={styles.details}>
               <div className={styles.detailRow}>
                 <dt>Contribution</dt>
-                <dd>₦{circle.contributionNgn.toLocaleString("en-NG")} / {circle.cycleFrequency}</dd>
+                <dd>
+                  {currencySymbol}
+                  {circle.contributionFiat.toLocaleString()} / {circle.cycleFrequency}
+                </dd>
               </div>
               <div className={styles.detailRow}>
                 <dt>Members</dt>
-                <dd>{members.length} / {circle.maxMembers}</dd>
+                <dd>
+                  {members.length} / {circle.maxMembers}
+                </dd>
               </div>
               <div className={styles.detailRow}>
                 <dt>Current Cycle</dt>
@@ -64,12 +132,12 @@ export default async function CircleDetailPage({ params }: Props) {
             </dl>
           </div>
 
-          <MemberPayoutList
-            circle={circle}
-            initialMembers={members}
-            isCreator={isCreator}
-          />
+          <MemberPayoutList circle={circle} initialMembers={members} isCreator={isCreator} currentUserId={userId} />
         </div>
+
+        {userId && (
+          <CircleChat circleId={circle.id} isActiveMember={isActiveMember} currentUserId={userId} />
+        )}
       </div>
     </div>
   );

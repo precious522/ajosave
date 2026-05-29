@@ -16,6 +16,18 @@ const PAYSTACK_CURRENCY_MAP: Record<SupportedCurrency, string> = {
   EUR: "EUR", // Note: Paystack may not support EUR directly, may need alternative provider
 };
 
+/** Platform fee as a fraction (e.g. 0.005 = 0.5%). Configurable via PLATFORM_FEE_PERCENT. */
+export const PLATFORM_FEE_RATE =
+  parseFloat(process.env.PLATFORM_FEE_PERCENT ?? "0.5") / 100;
+
+/**
+ * Calculate the platform fee for a given amount.
+ * Returns the fee in the same unit as `amount`.
+ */
+export function calculatePlatformFee(amount: number): number {
+  return Math.round(amount * PLATFORM_FEE_RATE);
+}
+
 export async function initializePayment(params: {
   email: string;
   amount: number;
@@ -23,19 +35,40 @@ export async function initializePayment(params: {
   reference: string;
   callbackUrl: string;
   metadata?: Record<string, unknown>;
-}): Promise<{ authorizationUrl: string; reference: string }> {
+}): Promise<{ authorizationUrl: string; reference: string; platformFee: number }> {
   const amountInSmallestUnit = toSmallestUnit(params.amount, params.currency);
   const paystackCurrency = PAYSTACK_CURRENCY_MAP[params.currency];
+  const platformFee = calculatePlatformFee(amountInSmallestUnit);
 
-  const { data } = await client.post("/transaction/initialize", {
+  const body: Record<string, unknown> = {
     email: params.email,
     amount: amountInSmallestUnit,
     currency: paystackCurrency,
     reference: params.reference,
     callback_url: params.callbackUrl,
-    metadata: params.metadata,
-  });
-  return { authorizationUrl: data.data.authorization_url, reference: data.data.reference };
+    metadata: {
+      ...params.metadata,
+      platform_fee: platformFee,
+      platform_fee_rate: PLATFORM_FEE_RATE,
+    },
+  };
+
+  // Add split if platform subaccount is configured
+  const platformSubaccount = serverConfig.paystack.platformSubaccount;
+  if (platformSubaccount) {
+    body.split = {
+      type: "flat",
+      bearer_type: "subaccount",
+      subaccounts: [{ subaccount: platformSubaccount, share: platformFee }],
+    };
+  }
+
+  const { data } = await client.post("/transaction/initialize", body);
+  return {
+    authorizationUrl: data.data.authorization_url,
+    reference: data.data.reference,
+    platformFee,
+  };
 }
 
 export async function verifyPayment(

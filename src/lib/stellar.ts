@@ -8,6 +8,8 @@ import {
   Networks,
 } from "@stellar/stellar-sdk";
 import { serverConfig } from "@/server/config";
+import logger from "@/lib/logger";
+
 
 const server = new Horizon.Server(serverConfig.stellar.horizonUrl);
 const USDC = new Asset(serverConfig.usdc.assetCode, serverConfig.usdc.issuer);
@@ -15,16 +17,40 @@ const networkPassphrase =
   serverConfig.stellar.network === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
 
 /** Error codes that are safe to retry (transient). */
-function isRetryable(err: unknown): boolean {
+function isRetryable(err: any): boolean {
+  // 1. Check Horizon response status codes
+  const status = err.response?.status;
+  if (status === 429 || (status >= 500 && status <= 504)) {
+    return true;
+  }
+
+  // 2. Check for specific Stellar transaction result codes
+  const resultCodes = err.response?.data?.extras?.result_codes;
+  if (resultCodes) {
+    // tx_bad_seq is explicitly NOT retryable as per requirements (fatal sequence mismatch)
+    if (resultCodes.transaction === "tx_bad_seq") return false;
+    
+    // Most other transaction/operation failures (underfunded, etc.) are fatal
+    // and shouldn't be retried blindly.
+  }
+
+  // 3. Fallback to message checking for network-level errors (no response)
   if (err instanceof Error) {
     const msg = err.message.toLowerCase();
-    // Horizon 503 / network timeouts are retryable; bad sequence / auth errors are not
-    if (msg.includes("bad_seq") || msg.includes("tx_bad_seq")) return false;
-    if (msg.includes("network") || msg.includes("503") || msg.includes("timeout")) return true;
+    if (
+      msg.includes("network") ||
+      msg.includes("503") ||
+      msg.includes("timeout") ||
+      msg.includes("deadline") ||
+      msg.includes("connection")
+    ) {
+      return true;
+    }
   }
-  // Retry on unknown errors by default
-  return true;
+
+  return false;
 }
+
 
 /**
  * Send USDC to `destination`.
@@ -35,11 +61,11 @@ function isRetryable(err: unknown): boolean {
  */
 export async function sendUsdcPayment(destination: string, amount: string): Promise<string> {
   const keypair = Keypair.fromSecret(serverConfig.stellar.serverSecretKey);
-  const MAX_RETRIES = 3;
+  const MAX_ATTEMPTS = 4; // Initial attempt + 3 retries
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      // Issue #20: fetch fresh account (and sequence number) on every attempt
+      // Fetch fresh account (and sequence number) on every attempt to prevent stale sequences
       const account = await server.loadAccount(keypair.publicKey());
 
       const tx = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase })
@@ -49,21 +75,37 @@ export async function sendUsdcPayment(destination: string, amount: string): Prom
 
       tx.sign(keypair);
       const result = await server.submitTransaction(tx);
+      
+      if (attempt > 1) {
+        logger.info({ attempt, destination, hash: result.hash }, "[stellar] sendUsdcPayment succeeded after retry");
+      }
+      
       return result.hash;
     } catch (err) {
-      const fatal = !isRetryable(err);
-      console.error(`[stellar] sendUsdcPayment attempt ${attempt}/${MAX_RETRIES} failed:`, err);
+      const retryable = isRetryable(err);
+      const willRetry = retryable && attempt < MAX_ATTEMPTS;
 
-      if (fatal || attempt === MAX_RETRIES) throw err;
+      if (!willRetry) {
+        logger.error(
+          { err, destination, amount, attempt, fatal: !retryable },
+          "[stellar] sendUsdcPayment failed permanently"
+        );
+        throw err;
+      }
 
-      // Exponential backoff: 500 ms, 1000 ms, 2000 ms …
-      await new Promise((r) => setTimeout(r, 500 * 2 ** (attempt - 1)));
+      const delay = 500 * 2 ** (attempt - 1);
+      logger.warn(
+        { err, attempt, delay, destination },
+        `[stellar] sendUsdcPayment attempt ${attempt} failed; retrying in ${delay}ms...`
+      );
+
+      await new Promise((r) => setTimeout(r, delay));
     }
   }
 
-  // Unreachable, but satisfies TypeScript
   throw new Error("sendUsdcPayment: exhausted retries");
 }
+
 
 /**
  * Issue #17: Returns balance AND trustline existence for USDC on the given account.

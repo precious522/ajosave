@@ -47,6 +47,7 @@ export function PayoutsTable({ payouts }: PayoutsTableProps) {
                   rel="noopener noreferrer"
                   className={styles.monospace}
                   style={{ color: "var(--color-brand-primary)", textDecoration: "underline" }}
+                  aria-label={`View transaction ${payout.txHash} on Stellar Explorer (opens in new tab)`}
                 >
                   <CopyableText
                     text={payout.txHash}

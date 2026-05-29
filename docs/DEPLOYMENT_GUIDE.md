@@ -194,7 +194,8 @@ curl -X POST http://localhost:3000/api/circles \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Test Circle",
-    "contributionNgn": 50000,
+    "contributionFiat": 50000,
+    "contributionCurrency": "NGN",
     "maxMembers": 5,
     "cycleFrequency": "monthly"
   }'

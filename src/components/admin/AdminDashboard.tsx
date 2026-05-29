@@ -5,11 +5,12 @@ import type { AdminCircleRow } from "@/server/services/admin.service";
 import type { AdminPayoutRow } from "@/server/services/admin.service";
 import { CirclesTable } from "./CirclesTable";
 import { PayoutsTable } from "./PayoutsTable";
+import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { usePolling } from "@/hooks/usePolling";
 import styles from "../admin.module.css";
 
-type Tab = "circles" | "payouts";
+type Tab = "circles" | "payouts" | "analytics";
 
 export function AdminDashboard() {
   const [tab, setTab] = useState<Tab>("circles");
@@ -88,8 +89,8 @@ export function AdminDashboard() {
     },
   });
 
-  const isConnected = tab === "circles" ? circlesConnected : payoutsConnected;
-  const currentError = tab === "circles" ? circlesError : payoutsError;
+  const isConnected = tab === "circles" ? circlesConnected : tab === "payouts" ? payoutsConnected : true;
+  const currentError = tab === "circles" ? circlesError : tab === "payouts" ? payoutsError : null;
 
   useEffect(() => {
     if (currentError) {
@@ -102,40 +103,59 @@ export function AdminDashboard() {
   return (
     <>
       <div className={styles.header}>
-        <div className={styles.tabs}>
+        <div className={styles.tabs} role="tablist" aria-label="Admin sections">
           <button
             className={styles.tab}
+            role="tab"
             aria-selected={tab === "circles"}
+            aria-controls="tab-panel-circles"
+            id="tab-circles"
             onClick={() => setTab("circles")}
           >
             Circles ({circles.length})
           </button>
           <button
             className={styles.tab}
+            role="tab"
             aria-selected={tab === "payouts"}
+            aria-controls="tab-panel-payouts"
+            id="tab-payouts"
             onClick={() => setTab("payouts")}
           >
             Payouts ({payouts.length})
+          </button>
+          <button
+            className={styles.tab}
+            aria-selected={tab === "analytics"}
+            onClick={() => setTab("analytics")}
+          >
+            Performance & Analytics
           </button>
         </div>
         <ConnectionStatus isConnected={isConnected} lastUpdate={lastUpdate || undefined} />
       </div>
 
       {newItemsCount > 0 && (
-        <div className={styles.newItemsBanner}>
+        <div className={styles.newItemsBanner} role="status" aria-live="polite">
           🎉 {newItemsCount} new {tab === "circles" ? "circle" : "payout"}
           {newItemsCount !== 1 ? "s" : ""} added!
         </div>
       )}
 
-      {error && <div className={styles.error}>{error}</div>}
+      {error && <div className={styles.error} role="alert">{error}</div>}
 
-      {loading ? (
+      {tab === "analytics" ? (
+        <AnalyticsDashboard />
+      ) : loading ? (
         <div className={styles.loading}>Loading…</div>
       ) : tab === "circles" ? (
-        <CirclesTable circles={circles} />
+        <div id="tab-panel-circles" role="tabpanel" aria-labelledby="tab-circles">
+          <CirclesTable circles={circles} />
+        </div>
       ) : (
-        <PayoutsTable payouts={payouts} />
+        <div id="tab-panel-payouts" role="tabpanel" aria-labelledby="tab-payouts">
+          <PayoutsTable payouts={payouts} />
+        </div>
       )}
     </>
   );

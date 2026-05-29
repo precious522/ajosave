@@ -5,8 +5,34 @@
 
 import { startHorizonStream } from "./services/horizon-stream.service";
 import { closePool } from "@/lib/db";
+import { serverConfig } from "./config";
 
 let initialized = false;
+
+/**
+ * Validate critical environment variables at startup
+ */
+function validateEnvironment(): void {
+  const errors: string[] = [];
+
+  if (!serverConfig.cronSecret) {
+    errors.push("CRON_SECRET is not set — cron endpoints will reject all requests");
+  }
+
+  if (!serverConfig.database.url) {
+    errors.push("DATABASE_URL is not set");
+  }
+
+  if (!serverConfig.stellar.serverSecretKey) {
+    errors.push("STELLAR_SERVER_SECRET_KEY is not set");
+  }
+
+  if (errors.length > 0) {
+    console.error("[startup] ⚠️  Environment validation failed:");
+    errors.forEach((err) => console.error(`  - ${err}`));
+    console.error("[startup] Set missing variables in .env.local (see .env.example)");
+  }
+}
 
 /**
  * Initialize all background services
@@ -19,6 +45,9 @@ export async function initializeServices(): Promise<void> {
   }
 
   console.log("[startup] Initializing background services...");
+
+  // Validate environment variables first
+  validateEnvironment();
 
   try {
     // Start Horizon payment stream
