@@ -5,13 +5,22 @@ import { POST } from "@/app/api/webhooks/paystack/route";
 import { NextRequest } from "next/server";
 import { createHmac } from "crypto";
 
-jest.mock("@/lib/db");
+jest.mock("@/lib/db", () => ({
+  query: jest.fn(),
+  transaction: jest.fn((cb) => cb(jest.fn())),
+}));
 jest.mock("@/server/config", () => ({
   serverConfig: { paystack: { secretKey: "test-secret" } },
+}));
+jest.mock("@/lib/logger", () => ({
+  warn: jest.fn(),
+  info: jest.fn(),
+  error: jest.fn(),
 }));
 
 import * as db from "@/lib/db";
 const mockQuery = db.query as jest.MockedFunction<typeof db.query>;
+const mockTransaction = db.transaction as jest.MockedFunction<typeof db.transaction>;
 
 const SECRET = "test-secret";
 
@@ -28,6 +37,7 @@ function makeRequest(body: object, signature?: string): NextRequest {
 }
 
 const CHARGE_SUCCESS = {
+  id: "evt_123",
   event: "charge.success",
   data: { reference: "ajo-circle-1-member-1-2" },
 };
@@ -42,24 +52,42 @@ describe("POST /api/webhooks/paystack", () => {
   });
 
   it("returns 200 and skips non-charge.success events", async () => {
-    const req = makeRequest({ event: "transfer.success", data: {} });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as any); // processed_webhooks check
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 } as any); // record non-success event
+
+    const req = makeRequest({ id: "evt_456", event: "transfer.success", data: {} });
     const res = await POST(req);
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.received).toBe(true);
-    expect(mockQuery).not.toHaveBeenCalled();
+    
+    // Should check if already processed
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining("FROM processed_webhooks"),
+      ["evt_456"]
+    );
+    // Should record the non-success event
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO processed_webhooks"),
+      ["evt_456", "transfer.success", expect.any(Object)]
+    );
   });
 
   it("returns 400 when reference is missing", async () => {
-    const req = makeRequest({ event: "charge.success", data: {} });
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as any); // processed_webhooks check
+    const req = makeRequest({ id: "evt_789", event: "charge.success", data: {} });
     const res = await POST(req);
     expect(res.status).toBe(400);
   });
 
   it("confirms contribution on charge.success using paystack_reference", async () => {
-    mockQuery
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 } as any)
-      .mockResolvedValueOnce({ rows: [], rowCount: 1 } as any);
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as any); // processed_webhooks check
+    
+    const mockTxQuery = jest.fn()
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 } as any) // insert processed_webhooks
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 } as any); // update contributions
+    
+    mockTransaction.mockImplementationOnce(async (cb) => cb(mockTxQuery));
 
     const req = makeRequest(CHARGE_SUCCESS);
     const res = await POST(req);
@@ -67,22 +95,25 @@ describe("POST /api/webhooks/paystack", () => {
     const json = await res.json();
     expect(json.received).toBe(true);
 
-    // Idempotency check uses paystack_reference
-    expect(mockQuery).toHaveBeenNthCalledWith(
-      1,
-      expect.stringContaining("paystack_reference = $1"),
-      ["ajo-circle-1-member-1-2"]
+    // Initial check
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining("FROM processed_webhooks"),
+      ["evt_123"]
     );
-    // Confirm update uses paystack_reference
-    expect(mockQuery).toHaveBeenNthCalledWith(
-      2,
-      expect.stringContaining("paystack_reference = $1"),
+
+    // Transactional steps
+    expect(mockTxQuery).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO processed_webhooks"),
+      ["evt_123", "charge.success", expect.any(Object)]
+    );
+    expect(mockTxQuery).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE contributions"),
       ["ajo-circle-1-member-1-2"]
     );
   });
 
-  it("returns duplicate:true and skips update for already-processed reference", async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [{ id: "contrib-1" }], rowCount: 1 } as any);
+  it("returns duplicate:true and skips update for already-processed event ID", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "evt_123" }], rowCount: 1 } as any);
 
     const req = makeRequest(CHARGE_SUCCESS);
     const res = await POST(req);
@@ -90,5 +121,6 @@ describe("POST /api/webhooks/paystack", () => {
     const json = await res.json();
     expect(json.duplicate).toBe(true);
     expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(mockTransaction).not.toHaveBeenCalled();
   });
 });

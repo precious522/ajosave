@@ -9,6 +9,8 @@ import {
   sendJoinRequestRejectedSms,
   sendCircleCancelledSms,
   sendCircleCancelledNoRefundSms,
+  sendCirclePausedSms,
+  sendCircleResumedSms,
 } from "@/lib/sms";
 import type { User } from "@/types";
 
@@ -242,4 +244,44 @@ export async function notifyCircleCancelled(
   } catch (error) {
     console.error(`Failed to send circle cancellation notification to ${userId}:`, error);
   }
+}
+
+/**
+ * Notify all circle members when the circle is paused
+ */
+export async function notifyCirclePaused(
+  memberUserIds: string[],
+  circleName: string
+): Promise<void> {
+  const notifications = memberUserIds.map(async (userId) => {
+    if (!(await canSendSms(userId))) return;
+    const phone = await getUserPhone(userId);
+    if (!phone) return;
+    try {
+      await sendCirclePausedSms(phone, circleName);
+    } catch (error) {
+      console.error(`Failed to send pause notification to ${userId}:`, error);
+    }
+  });
+  await Promise.allSettled(notifications);
+}
+
+/**
+ * Notify all circle members when the circle is resumed
+ */
+export async function notifyCircleResumed(
+  memberUserIds: string[],
+  circleName: string
+): Promise<void> {
+  const notifications = memberUserIds.map(async (userId) => {
+    if (!(await canSendSms(userId))) return;
+    const phone = await getUserPhone(userId);
+    if (!phone) return;
+    try {
+      await sendCircleResumedSms(phone, circleName);
+    } catch (error) {
+      console.error(`Failed to send resume notification to ${userId}:`, error);
+    }
+  });
+  await Promise.allSettled(notifications);
 }

@@ -40,9 +40,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={inter.variable}>
       <body>
         <SessionProvider>
+          <a href="#main-content" className="skip-link">Skip to main content</a>
           <SentryUserContext />
           <Navbar />
-          <main>{children}</main>
+          <main id="main-content">{children}</main>
           <Footer />
           <PWAProvider />
         </SessionProvider>

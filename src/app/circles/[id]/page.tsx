@@ -87,6 +87,13 @@ export default async function CircleDetailPage({ params }: Props) {
 
           <div className="card">
             <h2 className={styles.sectionTitle}>Circle Details</h2>
+            
+            {circle.nextPayoutAt && circle.status === "active" && (
+              <div style={{ marginBottom: "var(--space-6)" }}>
+                <PayoutCountdown nextPayoutAt={circle.nextPayoutAt} />
+              </div>
+            )}
+
             <dl className={styles.details}>
               <div className={styles.detailRow}>
                 <dt>Contribution</dt>
@@ -112,10 +119,6 @@ export default async function CircleDetailPage({ params }: Props) {
                 </div>
               )}
             </dl>
-
-            {circle.nextPayoutAt && circle.status === "active" && (
-              <PayoutCountdown nextPayoutAt={circle.nextPayoutAt} />
-            )}
           </div>
 
           <MemberPayoutList circle={circle} initialMembers={members} isCreator={isCreator} />

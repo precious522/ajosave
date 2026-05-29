@@ -1,6 +1,7 @@
 :root {
   /* Brand — deep green + gold (wealth, trust, Africa) */
   --color-brand-primary: #0f7a4a;
+  --color-brand-primary-rgb: 15, 122, 74;
   --color-brand-primary-hover: #0a5e38;
   --color-brand-accent: #f5a623;
   --color-brand-accent-hover: #d4891a;

@@ -5,7 +5,7 @@ import type { CreateCircleInput } from "@/types/schemas";
 import { getFiatPerUsdc } from "@/lib/fx";
 import { deployAjoContract } from "@/lib/soroban";
 import { sendUsdcPayment } from "@/lib/stellar";
-import { notifyCircleCancelled } from "./notification.service";
+import { notifyCircleCancelled, notifyCirclePaused, notifyCircleResumed } from "./notification.service";
 
 export const fiatToUsdc = async (amount: number, currency: string): Promise<string> => {
   const rate = await getFiatPerUsdc(currency);
@@ -27,6 +27,7 @@ const CIRCLE_SELECT = `
   current_cycle as "currentCycle", 
   (SELECT COUNT(*)::int FROM members WHERE circle_id = circles.id AND status = 'active') as "memberCount",
   next_payout_at as "nextPayoutAt", 
+  paused_at as "pausedAt",
   created_at as "createdAt", 
   updated_at as "updatedAt",
   deleted_at as "deletedAt"
@@ -566,6 +567,82 @@ export async function cancelCircle(
   );
 
   return circle;
+}
+
+export async function pauseCircle(
+  circleId: string,
+  creatorId: string
+): Promise<Circle> {
+  return transaction(async (q) => {
+    const { rows } = await q<Circle>(
+      `SELECT ${CIRCLE_SELECT} FROM circles WHERE id = $1 FOR UPDATE`,
+      [circleId]
+    );
+    const circle = rows[0];
+    if (!circle) throw new Error("Circle not found");
+    if (circle.creatorId !== creatorId) throw new Error("Only creator can pause the circle");
+    if (circle.status !== "active") throw new Error("Only active circles can be paused");
+
+    const { rows: updated } = await q<Circle>(
+      `UPDATE circles 
+       SET status = 'paused', paused_at = NOW(), updated_at = NOW() 
+       WHERE id = $1 
+       RETURNING ${CIRCLE_SELECT}`,
+      [circleId]
+    );
+
+    // Notify all members
+    const { rows: members } = await q<{ userId: string }>(
+      "SELECT user_id as \"userId\" FROM members WHERE circle_id = $1 AND status = 'active'",
+      [circleId]
+    );
+    await notifyCirclePaused(members.map(m => m.userId), circle.name);
+
+    return updated[0];
+  });
+}
+
+export async function resumeCircle(
+  circleId: string,
+  creatorId: string
+): Promise<Circle> {
+  return transaction(async (q) => {
+    const { rows } = await q<Circle>(
+      `SELECT ${CIRCLE_SELECT} FROM circles WHERE id = $1 FOR UPDATE`,
+      [circleId]
+    );
+    const circle = rows[0];
+    if (!circle) throw new Error("Circle not found");
+    if (circle.creatorId !== creatorId) throw new Error("Only creator can resume the circle");
+    if (circle.status !== "paused") throw new Error("Circle is not paused");
+
+    // Calculate pause duration and extend nextPayoutAt
+    const pausedAt = circle.pausedAt ? new Date(circle.pausedAt) : new Date();
+    const now = new Date();
+    const durationMs = now.getTime() - pausedAt.getTime();
+    
+    let nextPayoutAt = circle.nextPayoutAt ? new Date(circle.nextPayoutAt) : null;
+    if (nextPayoutAt) {
+      nextPayoutAt = new Date(nextPayoutAt.getTime() + durationMs);
+    }
+
+    const { rows: updated } = await q<Circle>(
+      `UPDATE circles 
+       SET status = 'active', next_payout_at = $2, paused_at = NULL, updated_at = NOW() 
+       WHERE id = $1 
+       RETURNING ${CIRCLE_SELECT}`,
+      [circleId, nextPayoutAt]
+    );
+
+    // Notify all members
+    const { rows: members } = await q<{ userId: string }>(
+      "SELECT user_id as \"userId\" FROM members WHERE circle_id = $1 AND status = 'active'",
+      [circleId]
+    );
+    await notifyCircleResumed(members.map(m => m.userId), circle.name);
+
+    return updated[0];
+  });
 }
 
 /**

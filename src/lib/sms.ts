@@ -108,3 +108,19 @@ export async function sendCircleCancelledNoRefundSms(
   const message = `Ajosave: The circle "${circleName}" has been cancelled by the creator. You had no confirmed contributions, so no refund is needed.`;
   await sendSms(phone, message);
 }
+
+export async function sendCirclePausedSms(
+  phone: string,
+  circleName: string
+): Promise<void> {
+  const message = `Ajosave: The circle "${circleName}" has been paused by the creator. Future payouts are temporarily suspended. You'll be notified when it resumes.`;
+  await sendSms(phone, message);
+}
+
+export async function sendCircleResumedSms(
+  phone: string,
+  circleName: string
+): Promise<void> {
+  const message = `Ajosave: The circle "${circleName}" has been resumed. Normal schedule and payouts have been restored.`;
+  await sendSms(phone, message);
+}
