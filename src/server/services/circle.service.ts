@@ -1,6 +1,6 @@
 import { query, transaction } from "@/lib/db";
 import { randomUUID } from "crypto";
-import type { Circle, Member, CircleStatus } from "@/types";
+import type { Circle, Member, CircleStatus, CycleFrequency } from "@/types";
 import type { CreateCircleInput } from "@/types/schemas";
 import { getFiatPerUsdc } from "@/lib/fx";
 import { deployAjoContract } from "@/lib/soroban";
@@ -657,7 +657,8 @@ export async function leaveCircle(
   circleId: string,
   userId: string
 ): Promise<void> {
-  return transaction(async (q) => {
+  let circleName = "";
+  await transaction(async (q) => {
     const { rows: circleRows } = await q<Circle>(
       "SELECT * FROM circles WHERE id = $1 FOR UPDATE",
       [circleId]
@@ -666,6 +667,8 @@ export async function leaveCircle(
     if (!circle) throw new Error("Circle not found");
     if (circle.status !== "open") throw new Error("Can only leave open circles");
     if (circle.creatorId === userId) throw new Error("Creator cannot leave the circle; cancel it instead");
+
+    circleName = circle.name;
 
     // Remove the member
     const { rowCount } = await q(
@@ -687,6 +690,20 @@ export async function leaveCircle(
       );
     }
   });
+
+  // Trigger waitlist notification if a spot opens up (asynchronously, non-blocking)
+  try {
+    const { getFirstWaitlistMember } = await import("./waitlist.service");
+    const nextUser = await getFirstWaitlistMember(circleId);
+    if (nextUser) {
+      const { notifyWaitlistSpotOpened } = await import("./notification.service");
+      notifyWaitlistSpotOpened(nextUser, circleName).catch((err) =>
+        console.error(`[leaveCircle] SMS notification failed for ${nextUser}:`, err)
+      );
+    }
+  } catch (err) {
+    console.error(`[leaveCircle] Failed to process waitlist notification for circle ${circleId}:`, err);
+  }
 }
 
 /**

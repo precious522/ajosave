@@ -11,6 +11,7 @@ import { getCurrencySymbol, SupportedCurrency } from "@/lib/currency";
 import { format } from "date-fns";
 import type { Metadata } from "next";
 import { CircleChat } from "@/components/circle/CircleChat";
+import { CircleWaitlist } from "@/components/circle/CircleWaitlist";
 import styles from "./page.module.css";
 
 interface Props {
@@ -60,6 +61,16 @@ export default async function CircleDetailPage({ params }: Props) {
   const isMember = members.some((m) => m.userId === userId);
   const isActiveMember = members.some((m) => m.userId === userId && m.status === "active");
   const currencySymbol = getCurrencySymbol(circle.contributionCurrency as SupportedCurrency);
+
+  // Load waitlist status for this user
+  let isOnWaitlist = false;
+  let waitlistPosition: number | null = null;
+  if (userId) {
+    const { getWaitlistStatus } = await import("@/server/services/waitlist.service");
+    const status = await getWaitlistStatus(circle.id, userId);
+    isOnWaitlist = status.isOnWaitlist;
+    waitlistPosition = status.position;
+  }
 
   return (
     <div className={styles.page}>

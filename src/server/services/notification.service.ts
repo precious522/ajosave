@@ -14,12 +14,9 @@ import {
 } from "@/lib/sms";
 import type { User } from "@/types";
 
-/**
- * Check if user has SMS notifications enabled
- */
 async function canSendSms(userId: string): Promise<boolean> {
-  const { rows } = await query<User>(
-    "SELECT sms_notifications_enabled FROM users WHERE id = $1",
+  const { rows } = await query<{ smsNotificationsEnabled: boolean }>(
+    `SELECT sms_notifications_enabled as "smsNotificationsEnabled" FROM users WHERE id = $1`,
     [userId]
   );
   return rows[0]?.smsNotificationsEnabled ?? false;

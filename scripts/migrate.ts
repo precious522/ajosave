@@ -1,5 +1,9 @@
 import { runner } from "node-pg-migrate";
 import path from "path";
+import pkg from "@next/env";
+const { loadEnvConfig } = pkg;
+
+loadEnvConfig(process.cwd());
 
 const direction = (process.argv[2] ?? "up") as "up" | "down";
 
