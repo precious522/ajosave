@@ -248,9 +248,23 @@ impl AjoContract {
     }
 
     /// Contribute for the current cycle.
-    pub fn contribute(env: Env, member: Address) {
+    ///
+    /// # Amount Validation (issue #265)
+    /// The caller must supply the exact `amount` they intend to transfer.
+    /// The contract rejects any value that does not equal `ContributionAmount`,
+    /// preventing both under-contributions and over-contributions.
+    pub fn contribute(env: Env, member: Address, amount: i128) {
         Self::extend_instance_ttl(&env);
         member.require_auth();
+
+        let required_amount: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::ContributionAmount)
+            .expect("not initialized");
+        if amount != required_amount {
+            panic!("contribution amount must equal required amount");
+        }
 
         let current_cycle: u32 = env.storage().instance().get(&DataKey::CurrentCycle).expect("not initialized");
         if current_cycle == 0 {
@@ -720,7 +734,7 @@ mod tests {
         client.payout(&signers.get(0).unwrap(), &op_hash);
         assert_eq!(token.balance(&members.get(0).unwrap()), 1_100_000_000);
 
-        for m in members.iter() { client.contribute(m); }
+        for m in members.iter() { client.contribute(m, &100_000_000); }
         env.ledger().with_mut(|l| l.timestamp = 172802);
 
         let op_hash2 = make_op_hash(&env, "payout:2");
@@ -728,7 +742,7 @@ mod tests {
         client.approve_operation(&signers.get(1).unwrap(), &op_hash2);
         client.payout(&signers.get(0).unwrap(), &op_hash2);
 
-        for m in members.iter() { client.contribute(m); }
+        for m in members.iter() { client.contribute(m, &100_000_000); }
         env.ledger().with_mut(|l| l.timestamp = 259203);
 
         let op_hash3 = make_op_hash(&env, "payout:3");
@@ -773,7 +787,7 @@ mod tests {
         env.mock_all_auths();
         let (_, members, _, _, client) = setup(&env);
         for m in members.iter() { client.join(m); }
-        client.contribute(&members.get(0).unwrap());
+        client.contribute(&members.get(0).unwrap(), &100_000_000);
     }
 
     #[test]
@@ -795,8 +809,8 @@ mod tests {
         client.payout();
 
         // Only members[0] and members[1] contribute for cycle 2; members[2] defaults
-        client.contribute(&members.get(0).unwrap());
-        client.contribute(&members.get(1).unwrap());
+        client.contribute(&members.get(0).unwrap(), &100_000_000);
+        client.contribute(&members.get(1).unwrap(), &100_000_000);
 
         env.ledger().with_mut(|l| l.timestamp = 172802);
         client.payout();
@@ -879,7 +893,7 @@ mod tests {
         }
 
         // Only member 0 contributes for cycle 2
-        client.contribute(&members.get(0).unwrap());
+        client.contribute(&members.get(0).unwrap(), &100_000_000);
 
         let status3 = client.get_contribution_status(&2u32);
         let (_, m0_paid) = status3.get(0).unwrap();

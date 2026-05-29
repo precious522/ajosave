@@ -106,7 +106,7 @@ mod integration {
 
                 // All members contribute for next cycle
                 for m in members.iter() {
-                    client.contribute(m);
+                    client.contribute(m, &100_000_000);
                 }
             }
         }
@@ -188,6 +188,24 @@ mod integration {
         f.client.join(&extra);
     }
 
+    /// contribute: rejects under-contribution (amount < required)
+    #[test]
+    #[should_panic(expected = "contribution amount must equal required amount")]
+    fn test_contribute_under_amount() {
+        let f = setup_fixture(2);
+        for m in f.members.iter() { f.client.join(m); }
+        f.client.contribute(&f.members.get(0).unwrap(), &(f.contribution - 1));
+    }
+
+    /// contribute: rejects over-contribution (amount > required)
+    #[test]
+    #[should_panic(expected = "contribution amount must equal required amount")]
+    fn test_contribute_over_amount() {
+        let f = setup_fixture(2);
+        for m in f.members.iter() { f.client.join(m); }
+        f.client.contribute(&f.members.get(0).unwrap(), &(f.contribution + 1));
+    }
+
     /// contribute: rejects non-member
     #[test]
     #[should_panic(expected = "not a member")]
@@ -197,7 +215,7 @@ mod integration {
             f.client.join(m);
         }
         let outsider = Address::generate(&f.env);
-        f.client.contribute(&outsider);
+        f.client.contribute(&outsider, &100_000_000);
     }
 
     /// contribute: rejects double contribution in same cycle
@@ -209,7 +227,7 @@ mod integration {
             f.client.join(m);
         }
         let member = f.members.get(0).unwrap();
-        f.client.contribute(&member); // second contribution in cycle 1
+        f.client.contribute(&member, &100_000_000); // second contribution in cycle 1
     }
 
     /// contribute: rejects before circle starts
@@ -219,7 +237,7 @@ mod integration {
         let f = setup_fixture(3);
         // Only one member joins — circle not started
         f.client.join(&f.members.get(0).unwrap());
-        f.client.contribute(&f.members.get(0).unwrap());
+        f.client.contribute(&f.members.get(0).unwrap(), &100_000_000);
     }
 
     /// payout: rejects before payout time
@@ -248,7 +266,7 @@ mod integration {
 
         // Contribute for cycle 2
         for m in f.members.iter() {
-            f.client.contribute(m);
+            f.client.contribute(m, &100_000_000);
         }
 
         // Cycle 2 payout (completes circle)
@@ -402,7 +420,7 @@ mod integration {
                 assert_eq!(current, cycle_num + 1);
                 assert!(!done);
                 for m in members.iter() {
-                    client.contribute(m);
+                    client.contribute(m, &100_000_000);
                 }
             }
         }
@@ -436,7 +454,7 @@ mod integration {
             client.payout();
             if cycle_num < *max_members {
                 for m in members.iter() {
-                    client.contribute(m);
+                    client.contribute(m, &100_000_000);
                 }
             }
         }

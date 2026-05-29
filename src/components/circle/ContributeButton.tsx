@@ -37,7 +37,11 @@ export function ContributeButton({ circleId, circleName, amountNgn, cycleFrequen
       toast("Redirecting to payment…", "info");
       window.location.href = json.data.authorizationUrl;
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to initiate payment", "error");
+      const msg = err instanceof Error ? err.message : "Failed to initiate payment";
+      const display = msg.includes("contribution amount must equal required amount")
+        ? `Contribution must be exactly ₦${amountNgn.toLocaleString("en-NG")} — please do not modify the amount.`
+        : msg;
+      toast(display, "error");
       setLoading(false);
       setShowModal(false);
     }
