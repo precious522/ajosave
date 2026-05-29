@@ -33,9 +33,10 @@ export async function adminListCircles(includeDeleted = false): Promise<AdminCir
        COUNT(m.id)::int AS "memberCount"
      FROM circles c
      LEFT JOIN members m ON m.circle_id = c.id
-     ${includeDeleted ? "" : "WHERE c.deleted_at IS NULL"}
+     WHERE ($1::boolean = true OR c.deleted_at IS NULL)
      GROUP BY c.id
-     ORDER BY c.created_at DESC`
+     ORDER BY c.created_at DESC`,
+    [includeDeleted]
   );
   return rows;
 }

@@ -98,11 +98,11 @@ export async function processMissedContributions(): Promise<void> {
   }
 }
 
-type ReminderWindow = { hoursLeft: number; lowerBound: string; upperBound: string };
+type ReminderWindow = { hoursLeft: number; lowerHours: number; upperHours: number };
 
 const WINDOWS: ReminderWindow[] = [
-  { hoursLeft: 24, lowerBound: "23 hours", upperBound: "25 hours" },
-  { hoursLeft: 2, lowerBound: "1 hour", upperBound: "3 hours" },
+  { hoursLeft: 24, lowerHours: 23, upperHours: 25 },
+  { hoursLeft: 2, lowerHours: 1, upperHours: 3 },
 ];
 
 /**
@@ -111,7 +111,7 @@ const WINDOWS: ReminderWindow[] = [
  * Per-circle errors are caught and logged; they do not abort the run.
  */
 export async function sendContributionReminders(): Promise<void> {
-  for (const { hoursLeft, lowerBound, upperBound } of WINDOWS) {
+  for (const { hoursLeft, lowerHours, upperHours } of WINDOWS) {
     const reminderType = `${hoursLeft}h`;
 
     const { rows: circles } = await query<Circle>(
@@ -120,8 +120,9 @@ export async function sendContributionReminders(): Promise<void> {
        FROM circles
        WHERE status = 'active'
          AND next_payout_at IS NOT NULL
-         AND next_payout_at > NOW() + INTERVAL '${lowerBound}'
-         AND next_payout_at < NOW() + INTERVAL '${upperBound}'`
+         AND next_payout_at > NOW() + ($1 * INTERVAL '1 hour')
+         AND next_payout_at < NOW() + ($2 * INTERVAL '1 hour')`,
+      [lowerHours, upperHours]
     );
 
     for (const circle of circles) {
