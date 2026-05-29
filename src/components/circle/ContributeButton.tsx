@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { event } from "@vercel/analytics";
 import { useToast } from "@/components/ui/Toast";
 import styles from "./ContributeButton.module.css";
 
@@ -28,6 +29,8 @@ export function ContributeButton({ circleId, circleName, amountNgn, cycleFrequen
       const res = await fetch(`/api/circles/${circleId}/contribute`, { method: "POST" });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
+      // Track contribution initiation (no PII)
+      try { event("contribution_made", { circleId, amountNgn }); } catch {}
       // Show fee info before redirecting
       if (json.data.platformFee > 0) {
         setFeeInfo(json.data);

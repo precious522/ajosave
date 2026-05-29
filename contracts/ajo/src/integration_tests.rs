@@ -74,7 +74,7 @@ mod integration {
             client.join(m);
         }
 
-        let (cycle, max, _, completed) = client.get_state();
+        let (cycle, max, _, completed, _) = client.get_state();
         assert_eq!(cycle, 1, "circle should start at cycle 1 after all members join");
         assert_eq!(max, *max_members);
         assert!(!completed);
@@ -100,7 +100,7 @@ mod integration {
             );
 
             if cycle_num < *max_members {
-                let (current, _, _, done) = client.get_state();
+                let (current, _, _, done, _) = client.get_state();
                 assert_eq!(current, cycle_num + 1);
                 assert!(!done);
 
@@ -111,7 +111,7 @@ mod integration {
             }
         }
 
-        let (_, _, _, completed) = client.get_state();
+        let (_, _, _, completed, _) = client.get_state();
         assert!(completed, "circle should be marked completed after all payouts");
     }
 
@@ -297,7 +297,7 @@ mod integration {
     #[test]
     fn test_get_state_before_start() {
         let f = setup_fixture(3);
-        let (cycle, _, _, completed) = f.client.get_state();
+        let (cycle, _, _, completed, _) = f.client.get_state();
         assert_eq!(cycle, 0);
         assert!(!completed);
     }
@@ -317,7 +317,7 @@ mod integration {
         f.env.ledger().with_mut(|l| l.timestamp = f.interval * 2 + 2);
         f.client.payout(); // must succeed — lock was released
 
-        let (cycle, _, _, _) = f.client.get_state();
+        let (cycle, _, _, _, _) = f.client.get_state();
         assert_eq!(cycle, 3);
     }
 
@@ -403,12 +403,12 @@ mod integration {
         // Join one member to set some state
         f.client.join(&f.members.get(0).unwrap());
 
-        let (cycle_before, max_before, _, completed_before) = f.client.get_state();
+        let (cycle_before, max_before, _, completed_before, _) = f.client.get_state();
 
         let new_wasm_hash = BytesN::from_array(&f.env, &[3u8; 32]);
         f.client.upgrade(&new_wasm_hash);
 
-        let (cycle_after, max_after, _, completed_after) = f.client.get_state();
+        let (cycle_after, max_after, _, completed_after, _) = f.client.get_state();
         assert_eq!(cycle_before, cycle_after, "cycle should be unchanged after upgrade");
         assert_eq!(max_before, max_after, "max_members should be unchanged after upgrade");
         assert_eq!(completed_before, completed_after, "completed flag should be unchanged after upgrade");
@@ -425,7 +425,7 @@ mod integration {
             client.join(m);
         }
 
-        let (cycle, max, _, completed) = client.get_state();
+        let (cycle, max, _, completed, _) = client.get_state();
         assert_eq!(cycle, 1);
         assert_eq!(max, 5);
         assert!(!completed);
@@ -448,7 +448,7 @@ mod integration {
             );
 
             if cycle_num < *max_members {
-                let (current, _, _, done) = client.get_state();
+                let (current, _, _, done, _) = client.get_state();
                 assert_eq!(current, cycle_num + 1);
                 assert!(!done);
                 for m in members.iter() {
@@ -457,7 +457,7 @@ mod integration {
             }
         }
 
-        let (_, _, _, completed) = client.get_state();
+        let (_, _, _, completed, _) = client.get_state();
         assert!(completed, "5-member circle should complete after 5 payouts");
     }
 

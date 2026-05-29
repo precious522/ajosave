@@ -5,6 +5,7 @@ import "@/styles/components.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { SessionProvider } from "next-auth/react";
+import { Analytics } from "@vercel/analytics/react";
 import { SentryUserContext } from "@/components/SentryUserContext";
 import { PWAProvider } from "@/components/PWAProvider";
 
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main id="main-content">{children}</main>
           <Footer />
           <PWAProvider />
+          <Analytics />
         </SessionProvider>
       </body>
     </html>

@@ -55,6 +55,8 @@ pub enum DataKey {
     TtlExtendTo,
     // Reentrancy guard (issue #264)
     PayoutLock,
+    // Emergency pause flag (admin-only)
+    Paused,
     // Schema versioning — bumped whenever storage layout changes
     StorageVersion,
 }
@@ -104,6 +106,7 @@ impl AjoContract {
         env.storage().instance().set(&DataKey::Members, &Vec::<Address>::new(&env));
         env.storage().instance().set(&DataKey::PayoutOrder, &Vec::<u32>::new(&env));
         env.storage().instance().set(&DataKey::CurrentCycle, &0u32);
+        env.storage().instance().set(&DataKey::Paused, &false);
         env.storage().instance().set(&DataKey::Completed, &false);
 
         env.events().publish(
@@ -162,6 +165,12 @@ impl AjoContract {
     pub fn contribute(env: Env, member: Address, amount: i128) {
         Self::extend_instance_ttl(&env);
         member.require_auth();
+
+        // Respect emergency pause
+        let paused: bool = env.storage().instance().get(&DataKey::Paused).unwrap_or(false);
+        if paused {
+            panic!("contract is paused");
+        }
 
         let required: i128 = env.storage().instance().get(&DataKey::ContributionAmount).expect("not initialized");
         if amount != required {
@@ -249,6 +258,12 @@ impl AjoContract {
     /// occur before the external token transfer.
     pub fn payout(env: Env) {
         Self::extend_instance_ttl(&env);
+
+        // Respect emergency pause
+        let paused: bool = env.storage().instance().get(&DataKey::Paused).unwrap_or(false);
+        if paused {
+            panic!("contract is paused");
+        }
 
         // ─── Reentrancy guard ─────────────────────────────────────────────────
         let locked: bool = env.storage().instance().get(&DataKey::PayoutLock).unwrap_or(false);
@@ -486,6 +501,22 @@ impl AjoContract {
         env.events().publish((Symbol::new(&env, "upgraded"),), (new_wasm_hash,));
     }
 
+    /// Emergency pause — admin-only. Halts `contribute` and `payout`.
+    pub fn pause(env: Env) {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Paused, &true);
+        env.events().publish((Symbol::new(&env, "paused"),), ());
+    }
+
+    /// Lift emergency pause — admin-only.
+    pub fn unpause(env: Env) {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("not initialized");
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Paused, &false);
+        env.events().publish((Symbol::new(&env, "unpaused"),), ());
+    }
+
     // ── Read-only ─────────────────────────────────────────────────────────────
 
     pub fn get_state(env: Env) -> (u32, u32, u64, bool) {
@@ -493,7 +524,8 @@ impl AjoContract {
         let max_members: u32 = env.storage().instance().get(&DataKey::MaxMembers).unwrap_or(0);
         let next_payout_time: u64 = env.storage().instance().get(&DataKey::NextPayoutTime).unwrap_or(0);
         let completed: bool = env.storage().instance().get(&DataKey::Completed).unwrap_or(false);
-        (current_cycle, max_members, next_payout_time, completed)
+        let paused: bool = env.storage().instance().get(&DataKey::Paused).unwrap_or(false);
+        (current_cycle, max_members, next_payout_time, completed, paused)
     }
 
     pub fn get_members(env: Env) -> Vec<Address> {
@@ -627,7 +659,7 @@ mod tests {
 
         for m in members.iter() { client.join(m); }
 
-        let (cycle, max, _, completed) = client.get_state();
+        let (cycle, max, _, completed, _) = client.get_state();
         assert_eq!(cycle, 1);
         assert_eq!(max, 3);
         assert!(!completed);
@@ -644,7 +676,7 @@ mod tests {
         env.ledger().with_mut(|l| l.timestamp = 259203);
         client.payout();
 
-        let (_, _, _, completed) = client.get_state();
+        let (_, _, _, completed, _) = client.get_state();
         assert!(completed);
     }
 
@@ -702,7 +734,7 @@ mod tests {
         client.join(&members.get(0).unwrap());
         env.ledger().with_mut(|l| l.sequence = 50);
 
-        let (cycle, _, _, _) = client.get_state();
+        let (cycle, _, _, _, _) = client.get_state();
         assert_eq!(cycle, 0);
     }
 
@@ -741,13 +773,13 @@ mod tests {
         for m in members.iter() { client.join(m); }
         env.ledger().with_mut(|l| l.timestamp = 86401);
 
-        let (cycle, _, _, completed) = client.get_state();
+        let (cycle, _, _, completed, _) = client.get_state();
         assert_eq!(cycle, 1);
         assert!(!completed);
 
         client.payout();
 
-        let (cycle, _, _, completed) = client.get_state();
+        let (cycle, _, _, completed, _) = client.get_state();
         assert_eq!(cycle, 2);
         assert!(!completed);
     }

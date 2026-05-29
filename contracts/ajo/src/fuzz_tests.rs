@@ -95,7 +95,7 @@ mod fuzz {
                 }
             }
 
-            let (_, _, _, completed) = client.get_state();
+            let (_, _, _, completed, _) = client.get_state();
             assert!(completed, "max_members={max_members}: circle must complete");
         }
     }
@@ -231,7 +231,7 @@ mod fuzz {
         // Payout should succeed without overflow panic
         ctx.client.payout();
 
-        let (cycle, _, _, _) = ctx.client.get_state();
+            let (cycle, _, _, _, _) = ctx.client.get_state();
         assert_eq!(cycle, 2, "should advance to cycle 2 after first payout");
     }
 }

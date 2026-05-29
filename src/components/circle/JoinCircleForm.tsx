@@ -88,6 +88,7 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
 
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
+      try { (await import('@vercel/analytics')).event('circle_joined', { circleId: circle.id }); } catch {}
 
       router.push(`/circles/${circle.id}?joined=true`);
       router.refresh();

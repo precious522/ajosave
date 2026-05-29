@@ -98,7 +98,9 @@ Sets up the circle. Stores all parameters and emits an `initialized` event.
 - Sends `contribution_amount × max_members` to the member at position `current_cycle - 1` (0-indexed).
 - Advances to the next cycle or marks the circle completed.
 
-### `get_state(env) → (current_cycle, max_members, next_payout_time, completed)`
+### `get_state(env) → (current_cycle, max_members, next_payout_time, completed, paused)`
+
+`paused` is `true` when the admin has emergency-paused the contract.
 
 Read-only. Returns the four key state values.
 
