@@ -4,6 +4,7 @@ import { verifyOtpSchema } from "@/types/schemas";
 import { getRedis } from "./redis";
 import { query } from "./db";
 import { isLockedOut, recordFailure, resetLockout } from "./lockout";
+import { generateRefreshToken, getTokenExpiries } from "./refresh-tokens";
 
 const ACCESS_TOKEN_TTL = 15 * 60; // 15 minutes in seconds
 const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
@@ -69,13 +70,16 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       const now = Math.floor(Date.now() / 1000);
 
-      // Initial sign-in: stamp both expiry times
+      // Initial sign-in: generate refresh token and stamp both expiry times
       if (user) {
+        const refreshToken = await generateRefreshToken(user.id);
         token.id = user.id;
         token.phone = (user as { phone?: string }).phone;
         token.role = (user as { role?: string }).role ?? "user";
-        token.accessTokenExpires = now + ACCESS_TOKEN_TTL;
-        token.refreshTokenExpires = now + REFRESH_TOKEN_TTL;
+        token.refreshToken = refreshToken;
+        const expiries = getTokenExpiries();
+        token.accessTokenExpires = expiries.accessTokenExpires;
+        token.refreshTokenExpires = expiries.refreshTokenExpires;
         return token;
       }
 
