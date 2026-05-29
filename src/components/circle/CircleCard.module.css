@@ -21,3 +21,16 @@
 
 .progress { height: 4px; background: var(--color-border); border-radius: var(--radius-full); overflow: hidden; }
 .progressBar { height: 100%; background: var(--color-brand-primary); border-radius: var(--radius-full); transition: width var(--transition-slow); }
+
+.category {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--color-accent, #6c47ff22);
+  color: var(--color-accent, #6c47ff);
+  margin-bottom: 0.5rem;
+}

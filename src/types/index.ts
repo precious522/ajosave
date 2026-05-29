@@ -1,4 +1,8 @@
+import { SupportedCurrency } from "@/lib/currency";
+
 // ─── User ─────────────────────────────────────────────────────────────────────
+export type UserRole = "user" | "admin";
+
 export interface User {
   id: string;
   phone: string;
@@ -6,44 +10,58 @@ export interface User {
   email?: string;
   stellarPublicKey?: string;
   reputationScore: number; // 0–100, built from on-time contributions
+  role: UserRole;
   createdAt: Date;
 }
 
 // ─── Circle ───────────────────────────────────────────────────────────────────
-export type CircleStatus = "open" | "active" | "completed" | "cancelled";
+export type CircleStatus = "open" | "active" | "completed" | "cancelled" | "paused";
+export type CircleType = "public" | "private";
 export type CycleFrequency = "weekly" | "biweekly" | "monthly";
+export type PayoutMethod = "fixed" | "randomized";
 
 export interface Circle {
   id: string;
   name: string;
   creatorId: string;
-  contributionUsdc: string;   // per-member per-cycle amount
-  contributionNgn: number;
+  contributionUsdc: string; // per-member per-cycle amount
+  contributionFiat: number; // renamed from contributionNgn
+  contributionCurrency: SupportedCurrency;
+  circleType: CircleType;
   maxMembers: number;
   cycleFrequency: CycleFrequency;
+  payoutMethod: PayoutMethod;
+  randomizationSeed?: string; // stored seed for verifiability
+  gracePeriodHours: number;   // hours after cycle start before member is marked defaulted
   status: CircleStatus;
-  contractId?: string;        // deployed Soroban circle contract
-  currentCycle: number;       // 1-indexed
+  contractId?: string; // deployed Soroban circle contract
+  currentCycle: number; // 1-indexed
+  memberCount?: number; // calculated field
   nextPayoutAt?: Date;
+  pausedAt?: Date | null;
+  minReputation?: number; // minimum reputation score required to join (0-100)
   createdAt: Date;
   updatedAt: Date;
+  deletedAt?: Date | null; // soft delete timestamp
 }
 
 // ─── Membership ───────────────────────────────────────────────────────────────
-export type MemberStatus = "pending" | "active" | "defaulted" | "completed";
+export type MemberStatus = "pending" | "active" | "rejected" | "defaulted" | "completed";
 
 export interface Member {
   id: string;
   circleId: string;
   userId: string;
-  position: number;           // payout order (1 = first to receive)
+  displayName?: string; // joined from users table
+  position: number | null; // payout order (1 = first to receive), null for pending members
   status: MemberStatus;
   hasReceivedPayout: boolean;
   joinedAt: Date;
+  reviewedAt?: Date; // when creator approved/rejected the request
 }
 
 // ─── Contribution ─────────────────────────────────────────────────────────────
-export type ContributionStatus = "pending" | "confirmed" | "missed";
+export type ContributionStatus = "pending" | "confirmed" | "missed" | "refund_pending" | "refunded";
 
 export interface Contribution {
   id: string;
@@ -54,6 +72,7 @@ export interface Contribution {
   status: ContributionStatus;
   txHash?: string;
   createdAt: Date;
+  updatedAt?: Date;
 }
 
 // ─── Payout ───────────────────────────────────────────────────────────────────
@@ -67,16 +86,14 @@ export interface Payout {
   paidAt: Date;
 }
 
-// ─── Reputation ───────────────────────────────────────────────────────────────
-export interface ReputationScore {
+// ─── Circle Chat ──────────────────────────────────────────────────────────────
+export interface CircleMessage {
   id: string;
+  circleId: string;
   userId: string;
-  score: number;              // 0–100
-  onTimeContributions: number;
-  circlesCompleted: number;
-  defaults: number;
-  stellarTxProof?: string;    // Stellar tx hash proving on-chain activity
-  updatedAt: Date;
+  displayName: string; // joined from users table at read time
+  content: string;
+  createdAt: string; // ISO 8601 string
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────

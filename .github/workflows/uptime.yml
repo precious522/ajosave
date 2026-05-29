@@ -1,0 +1,31 @@
+name: Uptime Monitor
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"  # every 5 minutes
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check /api/health
+        id: check
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.NEXT_PUBLIC_APP_URL }}/api/health")
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          if [ "$STATUS" != "200" ]; then
+            echo "UNHEALTHY: received HTTP $STATUS"
+            exit 1
+          fi
+          echo "Healthy (HTTP $STATUS)"
+
+      - name: Alert Slack on downtime
+        if: failure()
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "text": ":red_circle: *Ajosave is DOWN*\nHealth check returned HTTP ${{ steps.check.outputs.status }}\n<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+            }'

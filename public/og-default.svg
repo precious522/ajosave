@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#080f0b"/>
+  <rect x="0" y="0" width="1200" height="630" fill="url(#grad)"/>
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0e1a12"/>
+      <stop offset="100%" style="stop-color:#080f0b"/>
+    </linearGradient>
+  </defs>
+  <!-- Logo circle -->
+  <rect x="80" y="80" width="80" height="80" rx="20" fill="#0f7a4a"/>
+  <text x="120" y="140" font-size="52" text-anchor="middle" fill="#f5a623" font-family="system-ui,sans-serif" font-weight="bold">A</text>
+  <!-- Title -->
+  <text x="80" y="300" font-size="72" fill="#eef5f0" font-family="system-ui,sans-serif" font-weight="bold">Ajosave</text>
+  <!-- Subtitle -->
+  <text x="80" y="380" font-size="36" fill="#8aab94" font-family="system-ui,sans-serif">Trustless rotating savings on Stellar</text>
+  <!-- Tag line -->
+  <text x="80" y="450" font-size="28" fill="#4a6655" font-family="system-ui,sans-serif">Contribute in Naira · Receive in USDC · No middleman</text>
+  <!-- Bottom accent -->
+  <rect x="80" y="520" width="120" height="4" rx="2" fill="#0f7a4a"/>
+  <rect x="220" y="520" width="60" height="4" rx="2" fill="#f5a623"/>
+</svg>
