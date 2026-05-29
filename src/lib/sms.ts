@@ -1,7 +1,14 @@
 import axios from "axios";
 import { serverConfig } from "@/server/config";
+import { getCorrelationId } from "./correlation";
 
 const client = axios.create({ baseURL: "https://api.ng.termii.com/api" });
+
+client.interceptors.request.use((config) => {
+  const correlationId = getCorrelationId();
+  if (correlationId) config.headers["x-correlation-id"] = correlationId;
+  return config;
+});
 
 export async function sendOtp(phone: string): Promise<string> {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();

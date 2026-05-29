@@ -2,10 +2,18 @@ import axios from "axios";
 import { serverConfig } from "@/server/config";
 import type { SupportedCurrency } from "@/types";
 import { toSmallestUnit } from "./currency";
+import { getCorrelationId } from "./correlation";
 
 const client = axios.create({
   baseURL: "https://api.paystack.co",
   headers: { Authorization: `Bearer ${serverConfig.paystack.secretKey}` },
+});
+
+// Forward correlation ID on every outbound request
+client.interceptors.request.use((config) => {
+  const correlationId = getCorrelationId();
+  if (correlationId) config.headers["x-correlation-id"] = correlationId;
+  return config;
 });
 
 // Map our currency codes to Paystack currency codes
