@@ -18,7 +18,10 @@ export const serverConfig = {
     issuer: process.env.USDC_ISSUER ?? "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
     assetCode: process.env.USDC_ASSET_CODE ?? "USDC",
   },
-  paystack: { secretKey: process.env.PAYSTACK_SECRET_KEY ?? "" },
+  paystack: {
+    secretKey: process.env.PAYSTACK_SECRET_KEY ?? "",
+    platformSubaccount: process.env.PAYSTACK_PLATFORM_SUBACCOUNT ?? "",
+  },
   termii: {
     apiKey: process.env.TERMII_API_KEY ?? "",
     senderId: process.env.TERMII_SENDER_ID ?? "Ajosave",

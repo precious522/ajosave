@@ -158,7 +158,7 @@ export function CreateCircleForm() {
         {errors.circleType && <p className={styles.fieldError}>{errors.circleType.message}</p>}
       </div>
 
-      {error && <p className={styles.error}>{error}</p>}
+      {error && <p className={styles.error} role="alert">{error}</p>}
 
       <Button type="submit" fullWidth loading={isSubmitting} disabled={isSubmitting}>Create Circle</Button>
     </form>

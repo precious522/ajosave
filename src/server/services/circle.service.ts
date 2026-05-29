@@ -1,11 +1,11 @@
 import { query, transaction } from "@/lib/db";
 import { randomUUID } from "crypto";
-import type { Circle, Member, CircleStatus } from "@/types";
+import type { Circle, Member, CircleStatus, CycleFrequency } from "@/types";
 import type { CreateCircleInput } from "@/types/schemas";
 import { getFiatPerUsdc } from "@/lib/fx";
 import { deployAjoContract } from "@/lib/soroban";
 import { sendUsdcPayment } from "@/lib/stellar";
-import { notifyCircleCancelled } from "./notification.service";
+import { notifyCircleCancelled, notifyCirclePaused, notifyCircleResumed } from "./notification.service";
 
 export const fiatToUsdc = async (amount: number, currency: string): Promise<string> => {
   const rate = await getFiatPerUsdc(currency);
@@ -27,15 +27,17 @@ const CIRCLE_SELECT = `
   current_cycle as "currentCycle", 
   (SELECT COUNT(*)::int FROM members WHERE circle_id = circles.id AND status = 'active') as "memberCount",
   next_payout_at as "nextPayoutAt", 
+  paused_at as "pausedAt",
   created_at as "createdAt", 
   updated_at as "updatedAt",
   deleted_at as "deletedAt"
 `;
 
 const MEMBER_SELECT = `
-  id, circle_id as "circleId", user_id as "userId", 
-  position, status, has_received_payout as "hasReceivedPayout", 
-  joined_at as "joinedAt", reviewed_at as "reviewedAt"
+  m.id, m.circle_id as "circleId", m.user_id as "userId",
+  u.display_name as "displayName",
+  m.position, m.status, m.has_received_payout as "hasReceivedPayout",
+  m.joined_at as "joinedAt", m.reviewed_at as "reviewedAt"
 `;
 
 export async function createCircle(
@@ -191,7 +193,7 @@ export async function joinCircle(
     if (circle.status !== "open") throw new Error("Circle is not open for joining");
 
     const { rows: memberRows } = await q<Member>(
-      `SELECT ${MEMBER_SELECT} FROM members WHERE circle_id = $1 AND status IN ('active', 'pending')`,
+      `SELECT ${MEMBER_SELECT} FROM members m JOIN users u ON u.id = m.user_id WHERE m.circle_id = $1 AND m.status IN ('active', 'pending')`,
       [circleId]
     );
     if (memberRows.length >= circle.maxMembers) throw new Error("Circle is full");
@@ -205,8 +207,11 @@ export async function joinCircle(
     const reviewedAt = (status === "active" && isPrivate) ? new Date() : null;
 
     const { rows: newMember } = await q<Member>(
-      `INSERT INTO members (id, circle_id, user_id, position, status, has_received_payout, joined_at, reviewed_at)
-       VALUES ($1,$2,$3,$4,$5,false,NOW(), $6) RETURNING ${MEMBER_SELECT}`,
+      `WITH ins AS (
+         INSERT INTO members (id, circle_id, user_id, position, status, has_received_payout, joined_at, reviewed_at)
+         VALUES ($1,$2,$3,$4,$5,false,NOW(), $6) RETURNING *
+       )
+       SELECT ${MEMBER_SELECT} FROM ins m JOIN users u ON u.id = m.user_id`,
       [randomUUID(), circleId, userId, position, status, reviewedAt]
     );
 
@@ -228,7 +233,7 @@ export async function joinCircle(
 
 export async function getMembersByCircle(circleId: string): Promise<Member[]> {
   const { rows } = await query<Member>(
-    `SELECT ${MEMBER_SELECT} FROM members WHERE circle_id = $1 ORDER BY position`,
+    `SELECT ${MEMBER_SELECT} FROM members m JOIN users u ON u.id = m.user_id WHERE m.circle_id = $1 ORDER BY m.position`,
     [circleId]
   );
   return rows;
@@ -255,7 +260,7 @@ export async function shuffleAndPersistPositions(
     if (circle.status !== "open") throw new Error("Positions can only be shuffled before the circle starts");
 
     const { rows: memberRows } = await q<Member>(
-      `SELECT ${MEMBER_SELECT} FROM members WHERE circle_id = $1 ORDER BY position`,
+      `SELECT ${MEMBER_SELECT} FROM members m JOIN users u ON u.id = m.user_id WHERE m.circle_id = $1 ORDER BY m.position`,
       [circleId]
     );
 
@@ -568,6 +573,82 @@ export async function cancelCircle(
   return circle;
 }
 
+export async function pauseCircle(
+  circleId: string,
+  creatorId: string
+): Promise<Circle> {
+  return transaction(async (q) => {
+    const { rows } = await q<Circle>(
+      `SELECT ${CIRCLE_SELECT} FROM circles WHERE id = $1 FOR UPDATE`,
+      [circleId]
+    );
+    const circle = rows[0];
+    if (!circle) throw new Error("Circle not found");
+    if (circle.creatorId !== creatorId) throw new Error("Only creator can pause the circle");
+    if (circle.status !== "active") throw new Error("Only active circles can be paused");
+
+    const { rows: updated } = await q<Circle>(
+      `UPDATE circles 
+       SET status = 'paused', paused_at = NOW(), updated_at = NOW() 
+       WHERE id = $1 
+       RETURNING ${CIRCLE_SELECT}`,
+      [circleId]
+    );
+
+    // Notify all members
+    const { rows: members } = await q<{ userId: string }>(
+      "SELECT user_id as \"userId\" FROM members WHERE circle_id = $1 AND status = 'active'",
+      [circleId]
+    );
+    await notifyCirclePaused(members.map(m => m.userId), circle.name);
+
+    return updated[0];
+  });
+}
+
+export async function resumeCircle(
+  circleId: string,
+  creatorId: string
+): Promise<Circle> {
+  return transaction(async (q) => {
+    const { rows } = await q<Circle>(
+      `SELECT ${CIRCLE_SELECT} FROM circles WHERE id = $1 FOR UPDATE`,
+      [circleId]
+    );
+    const circle = rows[0];
+    if (!circle) throw new Error("Circle not found");
+    if (circle.creatorId !== creatorId) throw new Error("Only creator can resume the circle");
+    if (circle.status !== "paused") throw new Error("Circle is not paused");
+
+    // Calculate pause duration and extend nextPayoutAt
+    const pausedAt = circle.pausedAt ? new Date(circle.pausedAt) : new Date();
+    const now = new Date();
+    const durationMs = now.getTime() - pausedAt.getTime();
+    
+    let nextPayoutAt = circle.nextPayoutAt ? new Date(circle.nextPayoutAt) : null;
+    if (nextPayoutAt) {
+      nextPayoutAt = new Date(nextPayoutAt.getTime() + durationMs);
+    }
+
+    const { rows: updated } = await q<Circle>(
+      `UPDATE circles 
+       SET status = 'active', next_payout_at = $2, paused_at = NULL, updated_at = NOW() 
+       WHERE id = $1 
+       RETURNING ${CIRCLE_SELECT}`,
+      [circleId, nextPayoutAt]
+    );
+
+    // Notify all members
+    const { rows: members } = await q<{ userId: string }>(
+      "SELECT user_id as \"userId\" FROM members WHERE circle_id = $1 AND status = 'active'",
+      [circleId]
+    );
+    await notifyCircleResumed(members.map(m => m.userId), circle.name);
+
+    return updated[0];
+  });
+}
+
 /**
  * Leave an open circle.
  * Only members who are not the creator can leave.
@@ -576,7 +657,8 @@ export async function leaveCircle(
   circleId: string,
   userId: string
 ): Promise<void> {
-  return transaction(async (q) => {
+  let circleName = "";
+  await transaction(async (q) => {
     const { rows: circleRows } = await q<Circle>(
       "SELECT * FROM circles WHERE id = $1 FOR UPDATE",
       [circleId]
@@ -585,6 +667,8 @@ export async function leaveCircle(
     if (!circle) throw new Error("Circle not found");
     if (circle.status !== "open") throw new Error("Can only leave open circles");
     if (circle.creatorId === userId) throw new Error("Creator cannot leave the circle; cancel it instead");
+
+    circleName = circle.name;
 
     // Remove the member
     const { rowCount } = await q(
@@ -606,6 +690,20 @@ export async function leaveCircle(
       );
     }
   });
+
+  // Trigger waitlist notification if a spot opens up (asynchronously, non-blocking)
+  try {
+    const { getFirstWaitlistMember } = await import("./waitlist.service");
+    const nextUser = await getFirstWaitlistMember(circleId);
+    if (nextUser) {
+      const { notifyWaitlistSpotOpened } = await import("./notification.service");
+      notifyWaitlistSpotOpened(nextUser, circleName).catch((err) =>
+        console.error(`[leaveCircle] SMS notification failed for ${nextUser}:`, err)
+      );
+    }
+  } catch (err) {
+    console.error(`[leaveCircle] Failed to process waitlist notification for circle ${circleId}:`, err);
+  }
 }
 
 /**

@@ -1,7 +1,14 @@
 import axios from "axios";
 import { serverConfig } from "@/server/config";
+import { getCorrelationId } from "./correlation";
 
 const client = axios.create({ baseURL: "https://api.ng.termii.com/api" });
+
+client.interceptors.request.use((config) => {
+  const correlationId = getCorrelationId();
+  if (correlationId) config.headers["x-correlation-id"] = correlationId;
+  return config;
+});
 
 export async function sendOtp(phone: string): Promise<string> {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -106,5 +113,21 @@ export async function sendCircleCancelledNoRefundSms(
   circleName: string
 ): Promise<void> {
   const message = `Ajosave: The circle "${circleName}" has been cancelled by the creator. You had no confirmed contributions, so no refund is needed.`;
+  await sendSms(phone, message);
+}
+
+export async function sendCirclePausedSms(
+  phone: string,
+  circleName: string
+): Promise<void> {
+  const message = `Ajosave: The circle "${circleName}" has been paused by the creator. Future payouts are temporarily suspended. You'll be notified when it resumes.`;
+  await sendSms(phone, message);
+}
+
+export async function sendCircleResumedSms(
+  phone: string,
+  circleName: string
+): Promise<void> {
+  const message = `Ajosave: The circle "${circleName}" has been resumed. Normal schedule and payouts have been restored.`;
   await sendSms(phone, message);
 }

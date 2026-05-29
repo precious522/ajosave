@@ -20,6 +20,12 @@
 import { Pool, type QueryResult, type QueryResultRow } from "pg";
 import { serverConfig } from "@/server/config";
 
+const DB_POOL_SIZE = parseInt(process.env.DB_POOL_SIZE ?? "10", 10);
+const DB_CONNECTION_TIMEOUT_MS = parseInt(process.env.DB_CONNECTION_TIMEOUT_MS ?? "5000", 10);
+const DB_IDLE_TIMEOUT_MS = parseInt(process.env.DB_IDLE_TIMEOUT_MS ?? "30000", 10);
+const DB_MAX_RETRIES = parseInt(process.env.DB_MAX_RETRIES ?? "3", 10);
+const DB_RETRY_DELAY_MS = parseInt(process.env.DB_RETRY_DELAY_MS ?? "500", 10);
+
 let pool: Pool | null = null;
 
 function getPool(): Pool {
@@ -97,7 +103,7 @@ export function getPoolStats() {
 }
 
 /**
- * Execute a parameterized query.
+ * Execute a parameterized query with automatic retry on transient connection errors.
  * @param text  SQL with $1, $2, … placeholders — never interpolate user input
  * @param params  Values bound to placeholders
  */
@@ -105,7 +111,23 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params?: unknown[]
 ): Promise<QueryResult<T>> {
-  return getPool().query<T>(text, params);
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= DB_MAX_RETRIES; attempt++) {
+    try {
+      return await getPool().query<T>(text, params);
+    } catch (err) {
+      lastErr = err;
+      const isTransient =
+        err instanceof Error &&
+        (err.message.includes("Connection terminated") ||
+          err.message.includes("connection timeout") ||
+          err.message.includes("ECONNRESET"));
+      if (!isTransient || attempt === DB_MAX_RETRIES) throw err;
+      console.warn(`[db] query attempt ${attempt} failed, retrying in ${DB_RETRY_DELAY_MS}ms…`);
+      await sleep(DB_RETRY_DELAY_MS * attempt);
+    }
+  }
+  throw lastErr;
 }
 
 /**

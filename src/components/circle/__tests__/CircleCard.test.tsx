@@ -23,6 +23,7 @@ const baseCircle: Circle = {
   maxMembers: 5,
   cycleFrequency: "monthly",
   payoutMethod: "fixed",
+  gracePeriodHours: 24,
   status: "open",
   currentCycle: 0,
   nextPayoutAt: undefined,
@@ -49,7 +50,7 @@ describe("CircleCard", () => {
 
     it("displays cycle frequency", () => {
       render(<CircleCard circle={baseCircle} members={[]} />);
-      expect(screen.getByText(/monthly/i)).toBeInTheDocument();
+      expect(screen.getByText("/ monthly")).toBeInTheDocument();
     });
 
     it("displays member count", () => {
@@ -151,6 +152,16 @@ describe("CircleCard", () => {
       ];
       render(<CircleCard circle={baseCircle} members={members} showJoin />);
       expect(screen.queryByRole("link", { name: /join circle/i })).not.toBeInTheDocument();
+    });
+
+    it("shows 'Circle Full — View Details / Join Waitlist' link when circle is full (spotsLeft = 0)", () => {
+      const members = [
+        makeMember("a"), makeMember("b"), makeMember("c"), makeMember("d"), makeMember("e"),
+      ];
+      render(<CircleCard circle={baseCircle} members={members} showJoin />);
+      const link = screen.getByRole("link", { name: /circle full/i });
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute("href", "/circles/circle-1");
     });
 
     it("hides Join button when status is 'active'", () => {

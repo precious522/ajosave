@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { getCurrencySymbol, SupportedCurrency } from "@/lib/currency";
 import type { Circle } from "@/types";
 import styles from "./JoinCircleForm.module.css";
@@ -19,6 +20,7 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [noSavedKey, setNoSavedKey] = useState(false);
   const [stellarPublicKey, setStellarPublicKey] = useState("");
   const [optimisticCount, setOptimisticCount] = useState(circle.memberCount ?? 0);
 
@@ -110,23 +112,18 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
       </div>
 
       <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.field}>
-          <label htmlFor="stellarPublicKey" className={styles.label}>
-            Stellar Public Key
-          </label>
-          <input
-            id="stellarPublicKey"
-            type="text"
-            className={styles.input}
-            placeholder="G..."
-            required
-            value={stellarPublicKey}
-            onChange={(e) => setStellarPublicKey(e.target.value)}
-            disabled={loading}
-          />
-          <p className={styles.help}>
-            This is where your payouts will be sent. Make sure it's a valid Stellar address.
-          </p>
+        <Input
+          id="stellarPublicKey"
+          label="Stellar Public Key"
+          placeholder="G..."
+          required
+          value={stellarPublicKey}
+          onChange={(e) => setStellarPublicKey(e.target.value)}
+          disabled={loading}
+          hint="This is where your payouts will be sent. Make sure it's a valid Stellar address."
+        />
+
+        <div className={styles.field} style={{ marginTop: "var(--space-2)" }}>
           {connectionState !== "not_installed" && (
             <ConnectWalletButton
               connectionState={connectionState}
