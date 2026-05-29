@@ -67,8 +67,8 @@
 
 .error {
   padding: var(--space-3);
-  background-color: #fff1f0;
-  border: 1px solid #ffa39e;
+  background-color: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: var(--radius-md);
   color: var(--color-error);
   font-size: var(--text-sm);

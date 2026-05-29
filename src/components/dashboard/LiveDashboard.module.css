@@ -40,41 +40,6 @@
   }
 }
 
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-20) 0;
-  color: var(--color-text-secondary);
-  text-align: center;
-}
-
-.emptyIllustration {
-  margin-bottom: var(--space-2);
-}
-
-.emptyTitle {
-  font-size: var(--text-xl);
-  font-weight: var(--font-semibold);
-  color: var(--color-text-primary);
-}
-
-.emptyText {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  max-width: 360px;
-  line-height: var(--leading-relaxed);
-}
-
-.emptyCtas {
-  display: flex;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: var(--space-2);
-}
-
 .newItemsBanner {
   background: linear-gradient(
     135deg,

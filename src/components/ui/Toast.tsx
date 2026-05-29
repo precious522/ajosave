@@ -12,7 +12,7 @@ import styles from "./Toast.module.css";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type ToastVariant = "success" | "error" | "info";
+export type ToastVariant = "success" | "error" | "warning" | "info";
 
 interface Toast {
   id: string;

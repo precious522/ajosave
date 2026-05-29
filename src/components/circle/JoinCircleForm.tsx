@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { getCurrencySymbol, SupportedCurrency } from "@/lib/currency";
 import type { Circle } from "@/types";
 import styles from "./JoinCircleForm.module.css";
@@ -19,8 +20,11 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [noSavedKey, setNoSavedKey] = useState(false);
   const [stellarPublicKey, setStellarPublicKey] = useState("");
   const [optimisticCount, setOptimisticCount] = useState(circle.memberCount ?? 0);
+  const [noSavedKey, setNoSavedKey] = useState(false);
+  const [hasUsdcTrustline, setHasUsdcTrustline] = useState<boolean | null>(null);
 
   const { connectionState, publicKey, error: walletError, connect, disconnect } = useFreighterWallet();
 
@@ -46,6 +50,21 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
       setStellarPublicKey("");
     }
   }, [connectionState]);
+
+  useEffect(() => {
+    if (!stellarPublicKey || !/^G[A-Z2-7]{55}$/.test(stellarPublicKey)) {
+      setHasUsdcTrustline(null);
+      return;
+    }
+    fetch(`/api/stellar/balance?publicKey=${encodeURIComponent(stellarPublicKey)}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) {
+          setHasUsdcTrustline(json.data.hasTrustline);
+        }
+      })
+      .catch(() => {});
+  }, [stellarPublicKey]);
 
   const currencySymbol = getCurrencySymbol(circle.contributionCurrency as SupportedCurrency);
 
@@ -110,23 +129,18 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
       </div>
 
       <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.field}>
-          <label htmlFor="stellarPublicKey" className={styles.label}>
-            Stellar Public Key
-          </label>
-          <input
-            id="stellarPublicKey"
-            type="text"
-            className={styles.input}
-            placeholder="G..."
-            required
-            value={stellarPublicKey}
-            onChange={(e) => setStellarPublicKey(e.target.value)}
-            disabled={loading}
-          />
-          <p className={styles.help}>
-            This is where your payouts will be sent. Make sure it's a valid Stellar address.
-          </p>
+        <Input
+          id="stellarPublicKey"
+          label="Stellar Public Key"
+          placeholder="G..."
+          required
+          value={stellarPublicKey}
+          onChange={(e) => setStellarPublicKey(e.target.value)}
+          disabled={loading}
+          hint="This is where your payouts will be sent. Make sure it's a valid Stellar address."
+        />
+
+        <div className={styles.field} style={{ marginTop: "var(--space-2)" }}>
           {connectionState !== "not_installed" && (
             <ConnectWalletButton
               connectionState={connectionState}
@@ -147,6 +161,11 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
             <p role="alert" style={{ color: "var(--color-error)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
               {walletError}
             </p>
+          )}
+          {stellarPublicKey && /^G[A-Z2-7]{55}$/.test(stellarPublicKey) && hasUsdcTrustline === false && (
+            <div role="alert" style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid var(--color-error)", borderRadius: "var(--radius-md)", padding: "var(--space-3) var(--space-4)", marginTop: "0.5rem", fontSize: "0.875rem", color: "var(--color-error)" }}>
+              ⚠️ <strong>Missing USDC Trustline:</strong> The entered Stellar account does not have a USDC trustline. Payouts sent to this account will fail. Please add a USDC trustline before joining.
+            </div>
           )}
         </div>
 

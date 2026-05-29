@@ -13,7 +13,7 @@
 }
 
 .errorCard {
-  background-color: #fff1f0;
+  background-color: rgba(239, 68, 68, 0.08);
   border: 1px solid #ffa39e;
   padding: var(--space-4);
   border-radius: var(--radius-md);

@@ -34,9 +34,12 @@ export function PayoutCountdown({ nextPayoutAt }: Props) {
     };
   }, [nextPayoutAt]);
 
-  const [timeLeft, setTimeLeft] = useState<TimeLeft>(calculateTimeLeft());
+  const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(null);
 
   useEffect(() => {
+    // Initial sync to client time
+    setTimeLeft(calculateTimeLeft());
+
     const timer = setInterval(() => {
       const updated = calculateTimeLeft();
       setTimeLeft(updated);
@@ -48,6 +51,16 @@ export function PayoutCountdown({ nextPayoutAt }: Props) {
 
     return () => clearInterval(timer);
   }, [calculateTimeLeft]);
+
+  // Don't render until client-side sync to avoid hydration mismatch
+  if (!timeLeft) {
+    return (
+      <div className={styles.container} aria-hidden="true">
+        <span className={styles.label}>Calculating time...</span>
+        <div className={styles.skeleton}></div>
+      </div>
+    );
+  }
 
   if (timeLeft.isDue) {
     return (

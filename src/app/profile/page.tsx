@@ -22,6 +22,7 @@ export default function ProfilePage() {
   const [referral, setReferral] = useState<ReferralData | null>(null);
   const [stellarKeyError, setStellarKeyError] = useState<string | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
+  const [hasUsdcTrustline, setHasUsdcTrustline] = useState<boolean | null>(null);
   const [referralCode, setReferralCode] = useState("");
   const [referralMsg, setReferralMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [applyingCode, setApplyingCode] = useState(false);
@@ -61,10 +62,15 @@ export default function ProfilePage() {
   // Fetch USDC balance whenever the saved key changes
   useEffect(() => {
     const key = profile?.stellarPublicKey;
-    if (!key) { setUsdcBalance(null); return; }
+    if (!key) { setUsdcBalance(null); setHasUsdcTrustline(null); return; }
     fetch(`/api/stellar/balance?publicKey=${encodeURIComponent(key)}`)
       .then((r) => r.json())
-      .then((json) => { if (json.success) setUsdcBalance(json.data.balance); })
+      .then((json) => {
+        if (json.success) {
+          setUsdcBalance(json.data.balance);
+          setHasUsdcTrustline(json.data.hasTrustline);
+        }
+      })
       .catch(() => {});
   }, [profile?.stellarPublicKey]);
 
@@ -320,6 +326,11 @@ export default function ProfilePage() {
                 <p style={{ color: "var(--color-success)", fontSize: "0.875rem", marginTop: "0.5rem" }}>
                   Current USDC balance: <strong>{parseFloat(usdcBalance).toFixed(2)} USDC</strong>
                 </p>
+              )}
+              {profile?.stellarPublicKey && hasUsdcTrustline === false && (
+                <div role="alert" style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid var(--color-error)", borderRadius: "var(--radius-md)", padding: "var(--space-3) var(--space-4)", marginTop: "0.5rem", fontSize: "0.875rem", color: "var(--color-error)" }}>
+                  ⚠️ <strong>Missing USDC Trustline:</strong> Your Stellar account does not have a USDC trustline. Payouts sent to this account will fail. Please add a USDC trustline using your wallet (e.g. Freighter) or funding source.
+                </div>
               )}
             </div>
 

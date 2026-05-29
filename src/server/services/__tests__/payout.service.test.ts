@@ -45,7 +45,7 @@ jest.mock("@/server/services/payout-lock", () => ({
 
 const CIRCLE_ID = "circle-1";
 // Valid Stellar Ed25519 public key
-const RECIPIENT_KEY = "GDNIKPB2TPPS2RZG6TDW76YFSPNVEINVTJIPVEPA25Y74TPSLBNOA336";
+const RECIPIENT_KEY = "GCBVPTGYLOELZOOOLS4W765VOL3CCXWCTTTGWIYSAFPRLJLRG6VWAEB5";
 const TX_HASH = "abc123txhash";
 
 function makeCircle(overrides: Partial<Circle> = {}): Circle {

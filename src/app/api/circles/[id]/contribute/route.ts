@@ -63,7 +63,7 @@ export const POST = withErrorHandler(async (_req: NextRequest, ctx: unknown) => 
 
   const callbackUrl = `${serverConfig.app.url}/circles/${params.id}/contribute/callback?reference=${reference}`;
 
-  const { authorizationUrl } = await initializePayment({
+  const { authorizationUrl, platformFee } = await initializePayment({
     email: (session.user as { email?: string }).email ?? `${userId}@ajosave.app`,
     amount: circle.contributionFiat,
     currency: circle.contributionCurrency,
@@ -86,8 +86,8 @@ export const POST = withErrorHandler(async (_req: NextRequest, ctx: unknown) => 
     [randomUUID(), params.id, member.id, circle.currentCycle, circle.contributionUsdc, reference, authorizationUrl]
   );
 
-  return NextResponse.json<ApiResponse<{ authorizationUrl: string; reference: string }>>({
+  return NextResponse.json<ApiResponse<{ authorizationUrl: string; reference: string; platformFee: number }>>({
     success: true,
-    data: { authorizationUrl, reference },
+    data: { authorizationUrl, reference, platformFee },
   });
 });

@@ -22,7 +22,7 @@ jest.mock("@/server/config", () => ({
     stellar: {
       horizonUrl: "https://horizon-testnet.stellar.org",
       network: "testnet",
-      serverSecretKey: "SC3OW5EUYRI2QDTAXFWQYZZ6G4IBY3C3AZAV5PGHDI2BFZ7FVQ6SDZEA", // Mock key
+      serverSecretKey: "SA3JUJWMEM6TJAAFUZDARKE4WFJHWJKEDU6CW4AULPRNU6VL7PPXKVMZ", // Mock key
     },
     usdc: {
       assetCode: "USDC",
@@ -32,7 +32,7 @@ jest.mock("@/server/config", () => ({
 }));
 
 describe("sendUsdcPayment retry logic", () => {
-  const destination = "GDNIKPB2TPPS2RZG6TDW76YFSPNVEINVTJIPVEPA25Y74TPSLBNOA336";
+  const destination = "GCBVPTGYLOELZOOOLS4W765VOL3CCXWCTTTGWIYSAFPRLJLRG6VWAEB5";
   const amount = "10.0000000";
   const mockAccount = () => new Account(destination, "1");
 
@@ -47,10 +47,13 @@ describe("sendUsdcPayment retry logic", () => {
   });
 
   it("succeeds on the first attempt", async () => {
-    (horizonServer.loadAccount as jest.Mock) = jest.fn().mockResolvedValue(mockAccount());
-    (horizonServer.submitTransaction as jest.Mock) = jest
-      .fn()
-      .mockResolvedValue({ hash: "success-hash" });
+    const mockAccount = {
+      sequenceNumber: () => "1",
+      accountId: () => "GCBVPTGYLOELZOOOLS4W765VOL3CCXWCTTTGWIYSAFPRLJLRG6VWAEB5",
+      incrementSequenceNumber: () => {},
+    };
+    (horizonServer.loadAccount as jest.Mock) = jest.fn().mockResolvedValue(mockAccount);
+    (horizonServer.submitTransaction as jest.Mock) = jest.fn().mockResolvedValue({ hash: "success-hash" });
 
     const promise = sendUsdcPayment(destination, amount);
     const hash = await promise;
@@ -61,8 +64,13 @@ describe("sendUsdcPayment retry logic", () => {
   });
 
   it("retries on transient failure and eventually succeeds", async () => {
-    (horizonServer.loadAccount as jest.Mock) = jest.fn().mockResolvedValue(mockAccount());
-
+    const mockAccount = {
+      sequenceNumber: () => "1",
+      accountId: () => "GCBVPTGYLOELZOOOLS4W765VOL3CCXWCTTTGWIYSAFPRLJLRG6VWAEB5",
+      incrementSequenceNumber: () => {},
+    };
+    (horizonServer.loadAccount as jest.Mock) = jest.fn().mockResolvedValue(mockAccount);
+    
     // First attempt fails with 503
     const error503: any = new Error("Service Unavailable");
     error503.response = { status: 503 };
@@ -89,8 +97,13 @@ describe("sendUsdcPayment retry logic", () => {
   });
 
   it("stops retrying on fatal error (tx_bad_seq)", async () => {
-    (horizonServer.loadAccount as jest.Mock) = jest.fn().mockResolvedValue(mockAccount());
-
+    const mockAccount = {
+      sequenceNumber: () => "1",
+      accountId: () => "GCBVPTGYLOELZOOOLS4W765VOL3CCXWCTTTGWIYSAFPRLJLRG6VWAEB5",
+      incrementSequenceNumber: () => {},
+    };
+    (horizonServer.loadAccount as jest.Mock) = jest.fn().mockResolvedValue(mockAccount);
+    
     const errorBadSeq: any = new Error("Transaction Failed");
     errorBadSeq.response = {
       status: 400,
@@ -111,23 +124,28 @@ describe("sendUsdcPayment retry logic", () => {
   });
 
   it("exhausts retries on persistent transient failures", async () => {
-    (horizonServer.loadAccount as jest.Mock) = jest.fn().mockResolvedValue(mockAccount());
-
+    const mockAccount = {
+      sequenceNumber: () => "1",
+      accountId: () => "GCBVPTGYLOELZOOOLS4W765VOL3CCXWCTTTGWIYSAFPRLJLRG6VWAEB5",
+      incrementSequenceNumber: () => {},
+    };
+    (horizonServer.loadAccount as jest.Mock) = jest.fn().mockResolvedValue(mockAccount);
+    
     const errorTimeout: any = new Error("Network timeout");
     errorTimeout.response = { status: 504 };
 
     (horizonServer.submitTransaction as jest.Mock) = jest.fn().mockRejectedValue(errorTimeout);
 
     const promise = sendUsdcPayment(destination, amount);
-    const expectedRejection = expect(promise).rejects.toThrow("Network timeout");
-
+    const assertion = expect(promise).rejects.toThrow("Network timeout");
+    
     // Run all retries
     for (let i = 0; i < 3; i++) {
       await jest.runAllTimersAsync();
     }
-
-    await expectedRejection;
-
+    
+    await assertion;
+    
     // Initial + 3 retries = 4 attempts
     expect(horizonServer.loadAccount).toHaveBeenCalledTimes(4);
     expect(horizonServer.submitTransaction).toHaveBeenCalledTimes(4);

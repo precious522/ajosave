@@ -72,23 +72,27 @@ export default function SettingsPage() {
             </div>
             
             <div className={styles.settingControl}>
-              <label className={styles.toggle}>
+              <label className={styles.toggle} aria-label={`SMS notifications: ${smsEnabled ? "enabled" : "disabled"}`}>
                 <input
                   type="checkbox"
                   checked={smsEnabled}
                   onChange={handleToggleSms}
                   disabled={loading}
+                  aria-checked={smsEnabled}
                 />
-                <span className={styles.slider}></span>
+                <span className={styles.slider} aria-hidden="true"></span>
               </label>
-              <span className={styles.status}>
+              <span className={styles.status} aria-live="polite">
                 {smsEnabled ? "Enabled" : "Disabled"}
               </span>
             </div>
           </div>
 
           {message && (
-            <div className={`${styles.message} ${styles[message.type]}`}>
+            <div
+              className={`${styles.message} ${styles[message.type]}`}
+              role="alert"
+            >
               {message.text}
             </div>
           )}

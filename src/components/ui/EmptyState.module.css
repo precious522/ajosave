@@ -1,0 +1,33 @@
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-20) 0;
+  text-align: center;
+}
+
+.illustration {
+  margin-bottom: var(--space-2);
+}
+
+.title {
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+}
+
+.description {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  max-width: 360px;
+  line-height: var(--leading-relaxed);
+}
+
+.ctas {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: var(--space-2);
+}

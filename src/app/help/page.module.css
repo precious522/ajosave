@@ -1,29 +1,30 @@
 .container {
   min-height: 100vh;
   padding: 2rem 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--color-bg);
 }
 
 .content {
   max-width: 900px;
   margin: 0 auto;
-  background: white;
+  background: var(--color-bg-surface);
   border-radius: 12px;
   padding: 3rem 2rem;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border);
 }
 
 .title {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #1a202c;
+  color: var(--color-text-primary);
   margin-bottom: 0.5rem;
   text-align: center;
 }
 
 .subtitle {
   font-size: 1.125rem;
-  color: #718096;
+  color: var(--color-text-secondary);
   text-align: center;
   margin-bottom: 3rem;
 }
@@ -35,10 +36,10 @@
 .sectionTitle {
   font-size: 1.75rem;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--color-text-primary);
   margin-bottom: 1.5rem;
   padding-bottom: 0.5rem;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 2px solid var(--color-border);
 }
 
 .guide {
@@ -48,7 +49,7 @@
 .intro {
   font-size: 1.0625rem;
   line-height: 1.7;
-  color: #4a5568;
+  color: var(--color-text-secondary);
   margin-bottom: 2rem;
 }
 
@@ -59,22 +60,22 @@
 }
 
 .walletCard {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 1.5rem;
-  background: #f7fafc;
+  background: var(--color-bg-elevated);
 }
 
 .walletName {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--color-text-primary);
   margin-bottom: 0.5rem;
 }
 
 .walletDesc {
   font-size: 0.9375rem;
-  color: #718096;
+  color: var(--color-text-secondary);
   margin-bottom: 1rem;
 }
 
@@ -88,7 +89,7 @@
   padding-left: 1.5rem;
   margin-bottom: 0.5rem;
   position: relative;
-  color: #4a5568;
+  color: var(--color-text-secondary);
   line-height: 1.6;
 }
 
@@ -96,27 +97,27 @@
   content: "→";
   position: absolute;
   left: 0;
-  color: #667eea;
+  color: var(--color-brand-primary);
   font-weight: bold;
 }
 
 .warning {
-  background: #fff5f5;
-  border-left: 4px solid #fc8181;
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 4px solid var(--color-error);
   padding: 1rem 1.5rem;
   border-radius: 4px;
   margin-top: 2rem;
 }
 
 .warning strong {
-  color: #c53030;
+  color: var(--color-error);
   display: block;
   margin-bottom: 0.5rem;
 }
 
 .warning ul {
   margin: 0.5rem 0 0 1.5rem;
-  color: #742a2a;
+  color: var(--color-text-secondary);
 }
 
 .warning li {
@@ -124,16 +125,16 @@
 }
 
 .tip {
-  background: #f0fff4;
-  border-left: 4px solid #48bb78;
+  background: rgba(34, 197, 94, 0.08);
+  border-left: 4px solid var(--color-success);
   padding: 1rem 1.5rem;
   border-radius: 4px;
   margin-top: 1.5rem;
-  color: #22543d;
+  color: var(--color-text-secondary);
 }
 
 .tip strong {
-  color: #276749;
+  color: var(--color-success);
 }
 
 .stepsList {
@@ -147,7 +148,7 @@
   margin-bottom: 1.5rem;
   padding-left: 3rem;
   position: relative;
-  color: #4a5568;
+  color: var(--color-text-secondary);
   line-height: 1.7;
 }
 
@@ -156,8 +157,8 @@
   position: absolute;
   left: 0;
   top: 0;
-  background: #667eea;
-  color: white;
+  background: var(--color-brand-primary);
+  color: #fff;
   width: 2rem;
   height: 2rem;
   border-radius: 50%;
@@ -168,7 +169,7 @@
 }
 
 .comparisonTable {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -176,7 +177,7 @@
 .tableRow {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .tableRow:last-child {
@@ -184,8 +185,8 @@
 }
 
 .tableHeader {
-  background: #667eea;
-  color: white;
+  background: var(--color-brand-primary);
+  color: #fff;
   padding: 1rem;
   font-weight: 600;
   text-align: center;
@@ -193,8 +194,9 @@
 
 .tableCell {
   padding: 1rem;
-  border-right: 1px solid #e2e8f0;
-  color: #4a5568;
+  border-right: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface);
 }
 
 .tableCell:last-child {
@@ -208,26 +210,27 @@
 .question {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #2d3748;
+  color: var(--color-text-primary);
   margin-bottom: 0.75rem;
 }
 
 .answer {
   font-size: 1rem;
   line-height: 1.7;
-  color: #4a5568;
+  color: var(--color-text-secondary);
 }
 
 .contactBox {
-  background: #edf2f7;
+  background: var(--color-bg-elevated);
   border-radius: 8px;
   padding: 2rem;
   text-align: center;
+  border: 1px solid var(--color-border);
 }
 
 .contactBox p {
   font-size: 1.125rem;
-  color: #2d3748;
+  color: var(--color-text-primary);
   margin-bottom: 1rem;
 }
 
@@ -240,17 +243,17 @@
 .contactList li {
   margin-bottom: 0.75rem;
   font-size: 1rem;
-  color: #4a5568;
+  color: var(--color-text-secondary);
 }
 
 .link {
-  color: #667eea;
+  color: var(--color-brand-primary);
   text-decoration: underline;
   font-weight: 500;
 }
 
 .link:hover {
-  color: #764ba2;
+  color: var(--color-brand-primary-hover);
 }
 
 @media (max-width: 768px) {
@@ -272,7 +275,7 @@
 
   .tableCell {
     border-right: none;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--color-border);
   }
 
   .tableCell:last-child {
