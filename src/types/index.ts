@@ -67,6 +67,18 @@ export interface Payout {
   paidAt: Date;
 }
 
+// ─── Reputation ───────────────────────────────────────────────────────────────
+export interface ReputationScore {
+  id: string;
+  userId: string;
+  score: number;              // 0–100
+  onTimeContributions: number;
+  circlesCompleted: number;
+  defaults: number;
+  stellarTxProof?: string;    // Stellar tx hash proving on-chain activity
+  updatedAt: Date;
+}
+
 // ─── API ──────────────────────────────────────────────────────────────────────
 export interface ApiSuccess<T> {
   success: true;
