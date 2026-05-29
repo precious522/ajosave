@@ -19,6 +19,9 @@ export function CircleCard({ circle, members, showJoin = false }: CircleCardProp
         <h3 className={styles.name}>{circle.name}</h3>
         <CircleStatusBadge status={circle.status} />
       </div>
+      {circle.category && (
+        <span className={styles.category}>{circle.category}</span>
+      )}
 
       <div className={styles.amount}>
         ₦{circle.contributionNgn.toLocaleString("en-NG")}

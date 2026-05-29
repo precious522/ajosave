@@ -23,7 +23,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json<ApiResponse<Circle[]>>({ success: true, data: circles });
   }
 
-  const circles = await listOpenCircles();
+  const circles = await listOpenCircles(filter === "mine" ? undefined : searchParams.get("category") ?? undefined);
   return NextResponse.json<ApiResponse<Circle[]>>({ success: true, data: circles });
 });
 

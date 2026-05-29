@@ -12,6 +12,9 @@ export interface User {
 // ─── Circle ───────────────────────────────────────────────────────────────────
 export type CircleStatus = "open" | "active" | "completed" | "cancelled";
 export type CycleFrequency = "weekly" | "biweekly" | "monthly";
+export type CircleCategory = "family" | "friends" | "coworkers" | "diaspora";
+
+export const CIRCLE_CATEGORIES: CircleCategory[] = ["family", "friends", "coworkers", "diaspora"];
 
 export interface Circle {
   id: string;
@@ -21,6 +24,7 @@ export interface Circle {
   contributionNgn: number;
   maxMembers: number;
   cycleFrequency: CycleFrequency;
+  category: CircleCategory;
   status: CircleStatus;
   contractId?: string;        // deployed Soroban circle contract
   currentCycle: number;       // 1-indexed

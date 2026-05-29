@@ -23,6 +23,7 @@ export async function createCircle(
     contributionNgn: input.contributionNgn,
     maxMembers: input.maxMembers,
     cycleFrequency: input.cycleFrequency,
+    category: input.category,
     status: "open",
     currentCycle: 0,
     createdAt: new Date(),
@@ -37,8 +38,10 @@ export async function getCircleById(id: string): Promise<Circle | null> {
   return circles.get(id) ?? null;
 }
 
-export async function listOpenCircles(): Promise<Circle[]> {
-  return [...circles.values()].filter((c) => c.status === "open");
+export async function listOpenCircles(category?: string): Promise<Circle[]> {
+  return [...circles.values()].filter(
+    (c) => c.status === "open" && (!category || c.category === category)
+  );
 }
 
 export async function getCirclesByUser(userId: string): Promise<Circle[]> {
