@@ -18,11 +18,12 @@ CREATE TABLE IF NOT EXISTS circles (
   current_cycle INTEGER NOT NULL DEFAULT 0,
   next_payout_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  INDEX idx_circles_status (status),
-  INDEX idx_circles_creator_id (creator_id),
-  INDEX idx_circles_type (circle_type)
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_circles_status ON circles (status);
+CREATE INDEX IF NOT EXISTS idx_circles_creator_id ON circles (creator_id);
+CREATE INDEX IF NOT EXISTS idx_circles_type ON circles (circle_type);
 
 -- ─── Members ────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS members (
@@ -35,11 +36,12 @@ CREATE TABLE IF NOT EXISTS members (
   joined_at TIMESTAMP NOT NULL DEFAULT NOW(),
   reviewed_at TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  INDEX idx_members_circle_id (circle_id),
-  INDEX idx_members_user_id (user_id),
-  INDEX idx_members_status (status),
-  UNIQUE KEY unique_member_per_circle (circle_id, user_id)
+  UNIQUE (circle_id, user_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_members_circle_id ON members (circle_id);
+CREATE INDEX IF NOT EXISTS idx_members_user_id ON members (user_id);
+CREATE INDEX IF NOT EXISTS idx_members_status ON members (status);
 
 -- ─── Contributions ──────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS contributions (
@@ -53,11 +55,13 @@ CREATE TABLE IF NOT EXISTS contributions (
   authorization_url TEXT,
   tx_hash VARCHAR(255),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  INDEX idx_contributions_circle_id (circle_id),
-  INDEX idx_contributions_member_id (member_id),
-  INDEX idx_contributions_status (status),
-  UNIQUE KEY unique_contribution_per_cycle (member_id, cycle_number)
+  UNIQUE (member_id, cycle_number)
 );
+
+CREATE INDEX IF NOT EXISTS idx_contributions_circle_id ON contributions (circle_id);
+CREATE INDEX IF NOT EXISTS idx_contributions_circle_id_created_at ON contributions (circle_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_contributions_member_id ON contributions (member_id);
+CREATE INDEX IF NOT EXISTS idx_contributions_status ON contributions (status);
 
 -- ─── Payouts ────────────────────────────────────────────────────────────────────
 -- Stores all payout records for horizontal scalability and persistence
@@ -70,11 +74,13 @@ CREATE TABLE IF NOT EXISTS payouts (
   tx_hash VARCHAR(255) NOT NULL UNIQUE,
   paid_at TIMESTAMP NOT NULL DEFAULT NOW(),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  INDEX idx_payouts_circle_id (circle_id),
-  INDEX idx_payouts_member_id (recipient_member_id),
-  INDEX idx_payouts_paid_at (paid_at),
-  INDEX idx_payouts_cycle (circle_id, cycle_number)
+  UNIQUE (circle_id, cycle_number)
 );
+
+CREATE INDEX IF NOT EXISTS idx_payouts_circle_id ON payouts (circle_id);
+CREATE INDEX IF NOT EXISTS idx_payouts_member_id ON payouts (recipient_member_id);
+CREATE INDEX IF NOT EXISTS idx_payouts_paid_at ON payouts (paid_at);
+CREATE INDEX IF NOT EXISTS idx_payouts_cycle ON payouts (circle_id, cycle_number);
 
 -- ─── Users ──────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
@@ -85,6 +91,7 @@ CREATE TABLE IF NOT EXISTS users (
   stellar_public_key VARCHAR(56),
   reputation_score INTEGER NOT NULL DEFAULT 0 CHECK (reputation_score >= 0 AND reputation_score <= 100),
   sms_notifications_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  INDEX idx_users_phone (phone)
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users (phone);
