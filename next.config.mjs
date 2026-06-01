@@ -25,9 +25,16 @@ const cspHeader = [
 const securityHeaders = [
   // Report-Only first — switch to Content-Security-Policy once violations are reviewed
   { key: "Content-Security-Policy-Report-Only", value: cspHeader },
+  // Prevent MIME-type sniffing
   { key: "X-Content-Type-Options", value: "nosniff" },
+  // Deny framing to prevent clickjacking
   { key: "X-Frame-Options", value: "DENY" },
+  // Control referrer information
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // HSTS: 2-year max-age, include subdomains, preload-ready
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  // Disable browser features not needed by this app
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
 ];
 
 const nextConfig = {
@@ -35,19 +42,6 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["@stellar/stellar-sdk"],
     instrumentationHook: true,
-  },
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains; preload",
-          },
-        ],
-      },
-    ];
   },
   async redirects() {
     return process.env.NODE_ENV === "production"
