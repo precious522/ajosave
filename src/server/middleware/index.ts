@@ -7,6 +7,7 @@ import { getRedis } from "@/lib/redis";
 import { randomUUID } from "crypto";
 import logger from "@/lib/logger";
 import { runWithCorrelationId } from "@/lib/correlation";
+import { sanitizeBody } from "@/lib/sanitize";
 
 type Handler = (_req: NextRequest, _ctx?: unknown) => Promise<NextResponse>;
 
@@ -149,5 +150,43 @@ export function withRateLimit(
     response.headers.set("X-RateLimit-Remaining", String(result.remaining));
     response.headers.set("X-RateLimit-Reset", String(Math.ceil(result.resetAt / 1000)));
     return response;
+  };
+}
+
+/**
+ * Middleware wrapper that sanitizes the JSON request body before passing it
+ * to the handler. The sanitized body is attached as `req.sanitizedBody` via
+ * a patched clone so downstream handlers can call `req.json()` normally, or
+ * read `(req as SanitizedRequest).sanitizedBody` directly.
+ *
+ * Usage: wrap your handler with withSanitizedBody, then read the body via
+ * `await req.json()` — the middleware replaces the body stream with the
+ * sanitized payload.
+ */
+export type SanitizedRequest = NextRequest & { sanitizedBody: unknown };
+
+export function withSanitizedBody(handler: Handler): Handler {
+  return async (req, ctx) => {
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json<ApiError>(
+        { success: false, error: "Invalid JSON body", code: "BAD_REQUEST" },
+        { status: 400 }
+      );
+    }
+
+    const clean = sanitizeBody(body);
+
+    // Re-create the request with the sanitized body so req.json() works downstream
+    const sanitized = new NextRequest(req.url, {
+      method: req.method,
+      headers: req.headers,
+      body: JSON.stringify(clean),
+    });
+    (sanitized as SanitizedRequest).sanitizedBody = clean;
+
+    return handler(sanitized, ctx);
   };
 }

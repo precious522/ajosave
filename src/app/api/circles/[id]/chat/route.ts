@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { withErrorHandler, withRateLimit } from "@/server/middleware";
+import { withErrorHandler, withRateLimit, withSanitizedBody } from "@/server/middleware";
 import { getMessages, postMessage } from "@/server/services/chat.service";
 import { broadcastChatMessage } from "@/server/websocket";
 import type { ApiResponse, CircleMessage } from "@/types";
@@ -75,7 +75,7 @@ export const GET = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
 
 export const POST = withErrorHandler(
   withRateLimit(
-    async (req: NextRequest, ctx: unknown) => {
+    withSanitizedBody(async (req: NextRequest, ctx: unknown) => {
       const session = await getServerSession(authOptions);
       if (!session?.user) {
         return NextResponse.json<ApiResponse<never>>(
@@ -126,7 +126,7 @@ export const POST = withErrorHandler(
         { success: true, data: message },
         { status: 201 }
       );
-    },
+    }),
     { limit: 30, windowMs: 60_000 }
   )
 );

@@ -3,9 +3,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { toggleSmsNotifications } from "@/server/services/notification.service";
 import { smsPreferencesSchema } from "@/types/schemas";
+import { withSanitizedBody } from "@/server/middleware";
 import type { ApiResponse } from "@/types";
 
-export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<{ enabled: boolean }>>> {
+export const POST = withSanitizedBody(async (req: NextRequest): Promise<NextResponse<ApiResponse<{ enabled: boolean }>>> => {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -38,4 +39,4 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<{
       { status: 500 }
     );
   }
-}
+});

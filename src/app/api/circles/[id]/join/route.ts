@@ -3,12 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { joinCircleSchema } from "@/types/schemas";
 import { joinCircle, getCircleById } from "@/server/services/circle.service";
-import { withErrorHandler } from "@/server/middleware";
+import { withErrorHandler, withSanitizedBody } from "@/server/middleware";
 import { verifyInviteToken } from "@/lib/tokens";
 import { checkReputationGate } from "@/server/services/reputation.service";
 import type { ApiResponse, Member } from "@/types";
 
-export const POST = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
+export const POST = withErrorHandler(withSanitizedBody(async (req: NextRequest, ctx: unknown) => {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return NextResponse.json<ApiResponse<never>>(
@@ -77,4 +77,4 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
   const userId = (session.user as { id: string }).id;
   const member = await joinCircle(params.id, userId, isInvited);
   return NextResponse.json<ApiResponse<Member>>({ success: true, data: member }, { status: 201 });
-});
+}));
