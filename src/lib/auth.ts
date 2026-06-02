@@ -5,6 +5,7 @@ import { getRedis } from "./redis";
 import { query } from "./db";
 import { isLockedOut, recordFailure, resetLockout } from "./lockout";
 import { generateRefreshToken, getTokenExpiries } from "./refresh-tokens";
+import { encrypt, hmacIndex } from "./encryption";
 
 const ACCESS_TOKEN_TTL = 15 * 60; // 15 minutes in seconds
 const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
@@ -43,21 +44,22 @@ export const authOptions: NextAuthOptions = {
         await resetLockout(phone);
         await redis.del(`otp:${phone}`); // OTP is single-use
 
-        // Load user from DB
+        // Load user via blind index (phone_hash) — never compare plaintext
+        const phoneHash = hmacIndex(phone);
         const result = await query<{ id: string; phone: string; name: string; role: string }>(
-          "SELECT id, phone, display_name as name, role FROM users WHERE phone = $1",
-          [phone]
+          "SELECT id, phone, display_name as name, role FROM users WHERE phone_hash = $1",
+          [phoneHash]
         );
         const user = result.rows[0];
 
         if (!user) {
           // Upsert: create user record on first successful OTP verification
           const { rows } = await query<{ id: string; phone: string; name: string; role: string }>(
-            `INSERT INTO users (id, phone, display_name, role, reputation_score, created_at)
-             VALUES (gen_random_uuid(), $1, 'Ajosave User', 'user', 0, NOW())
-             ON CONFLICT (phone) DO UPDATE SET phone = EXCLUDED.phone
+            `INSERT INTO users (id, phone, phone_hash, display_name, role, reputation_score, created_at)
+             VALUES (gen_random_uuid(), $1, $2, 'Ajosave User', 'user', 0, NOW())
+             ON CONFLICT (phone_hash) DO UPDATE SET phone = EXCLUDED.phone
              RETURNING id, phone, display_name as name, role`,
-            [phone]
+            [encrypt(phone), phoneHash]
           );
           return rows[0];
         }

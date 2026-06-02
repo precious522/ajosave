@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { query } from "@/lib/db";
+import { decrypt, encrypt } from "@/lib/encryption";
 import { z } from "zod";
 import type { ApiResponse } from "@/types";
 
@@ -68,9 +69,9 @@ export async function GET(): Promise<NextResponse<ApiResponse<ProfileData>>> {
     success: true,
     data: {
       id: row.id,
-      phone: row.phone,
+      phone: decrypt(row.phone),
       displayName: row.display_name,
-      email: row.email,
+      email: row.email ? decrypt(row.email) : null,
       stellarPublicKey: row.stellar_public_key,
       reputationScore: row.reputation_score,
       contributionStats: {
@@ -109,7 +110,7 @@ export async function PATCH(
      WHERE id = $4`,
     [
       displayName ?? null,
-      email !== undefined ? (email === "" ? null : email) : null,
+      email !== undefined ? (email === "" ? null : encrypt(email)) : null,
       stellarPublicKey !== undefined ? (stellarPublicKey === "" ? null : stellarPublicKey) : null,
       session.user.id,
     ]
