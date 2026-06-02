@@ -6,14 +6,17 @@ import { initializePayment } from "@/lib/paystack";
 import { serverConfig } from "@/server/config";
 import { withErrorHandler } from "@/server/middleware";
 import { query } from "@/lib/db";
-import { randomUUID } from "crypto";
 import { z } from "zod";
 import type { ApiResponse } from "@/types";
 
 const bodySchema = z.object({
-  partialAmountFiat: z.number().positive().optional(),
+  amountFiat: z.number().positive(),
 });
 
+/**
+ * POST /api/v1/circles/:id/topup
+ * Pay the remaining balance on a partial contribution for the current cycle.
+ */
 export const POST = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -29,12 +32,6 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
     return NextResponse.json<ApiResponse<never>>(
       { success: false, error: "Circle not found" },
       { status: 404 }
-    );
-  }
-  if (circle.status !== "active") {
-    return NextResponse.json<ApiResponse<never>>(
-      { success: false, error: "Circle is not active" },
-      { status: 400 }
     );
   }
 
@@ -57,67 +54,83 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
     );
   }
 
-  // Check for existing contribution this cycle
-  const { rows: existing } = await query<{
+  // Fetch existing partial contribution
+  const { rows } = await query<{
     id: string;
-    paystack_reference: string;
-    authorization_url: string;
+    amount_usdc: string;
     amount_paid_usdc: string;
     status: string;
   }>(
-    `SELECT id, paystack_reference, authorization_url, amount_paid_usdc, status
+    `SELECT id, amount_usdc, amount_paid_usdc, status
      FROM contributions WHERE member_id = $1 AND cycle_number = $2 LIMIT 1`,
     [member.id, circle.currentCycle]
   );
 
-  if (existing[0]?.status === "confirmed") {
+  if (!rows[0]) {
     return NextResponse.json<ApiResponse<never>>(
-      { success: false, error: "Contribution already confirmed for this cycle" },
+      { success: false, error: "No contribution found for this cycle. Use the contribute endpoint first." },
+      { status: 404 }
+    );
+  }
+
+  if (rows[0].status === "confirmed") {
+    return NextResponse.json<ApiResponse<never>>(
+      { success: false, error: "Contribution already fully paid" },
       { status: 400 }
     );
   }
 
-  // Return existing pending URL if present
-  if (existing[0]?.status === "pending" && existing[0].authorization_url) {
-    return NextResponse.json<ApiResponse<{ authorizationUrl: string; reference: string }>>({
-      success: true,
-      data: { authorizationUrl: existing[0].authorization_url, reference: existing[0].paystack_reference },
-    });
+  const fullUsdc = parseFloat(rows[0].amount_usdc);
+  const paidUsdc = parseFloat(rows[0].amount_paid_usdc);
+  const remainingUsdc = fullUsdc - paidUsdc;
+
+  if (remainingUsdc <= 0) {
+    return NextResponse.json<ApiResponse<never>>(
+      { success: false, error: "No remaining balance to top up" },
+      { status: 400 }
+    );
   }
 
   const fullFiat = circle.contributionFiat;
-  const fullUsdc = parseFloat(circle.contributionUsdc);
-  const payFiat = parsed.data.partialAmountFiat
-    ? Math.min(parsed.data.partialAmountFiat, fullFiat)
-    : fullFiat;
-  const isPartial = payFiat < fullFiat;
-  const payUsdc = ((payFiat / fullFiat) * fullUsdc).toFixed(7);
+  // Cap top-up at remaining balance
+  const remainingFiat = (remainingUsdc / fullUsdc) * fullFiat;
+  const topUpFiat = Math.min(parsed.data.amountFiat, remainingFiat);
+  const topUpUsdc = ((topUpFiat / fullFiat) * fullUsdc).toFixed(7);
 
-  const reference = `ajo-${params.id}-${member.id}-${circle.currentCycle}-${Date.now()}`;
+  const reference = `ajo-topup-${params.id}-${member.id}-${circle.currentCycle}-${Date.now()}`;
   const callbackUrl = `${serverConfig.app.url}/circles/${params.id}/contribute/callback?reference=${reference}`;
 
   const { authorizationUrl } = await initializePayment({
     email: (session.user as { email?: string }).email ?? `${userId}@ajosave.app`,
-    amount: payFiat,
+    amount: topUpFiat,
     currency: circle.contributionCurrency,
     reference,
     callbackUrl,
-    metadata: { circleId: params.id, memberId: member.id, cycleNumber: circle.currentCycle, isPartial, payUsdc },
+    metadata: {
+      circleId: params.id,
+      memberId: member.id,
+      cycleNumber: circle.currentCycle,
+      isTopUp: true,
+      topUpUsdc,
+      contributionId: rows[0].id,
+    },
   });
 
+  // Store the top-up reference so the webhook can credit it
   await query(
-    `INSERT INTO contributions
-       (id, circle_id, member_id, cycle_number, amount_usdc, amount_paid_usdc, is_partial, status, paystack_reference, authorization_url)
-     VALUES ($1,$2,$3,$4,$5,0,$6,'pending',$7,$8)
-     ON CONFLICT (member_id, cycle_number) DO UPDATE
-       SET paystack_reference = EXCLUDED.paystack_reference,
-           authorization_url  = EXCLUDED.authorization_url,
-           is_partial         = EXCLUDED.is_partial`,
-    [randomUUID(), params.id, member.id, circle.currentCycle, circle.contributionUsdc, isPartial, reference, authorizationUrl]
+    `UPDATE contributions
+     SET paystack_reference = $1, authorization_url = $2, updated_at = NOW()
+     WHERE id = $3`,
+    [reference, authorizationUrl, rows[0].id]
   );
 
-  return NextResponse.json<ApiResponse<{ authorizationUrl: string; reference: string; isPartial: boolean; remainingUsdc: string }>>({
+  return NextResponse.json<ApiResponse<{ authorizationUrl: string; reference: string; remainingUsdc: string; topUpUsdc: string }>>({
     success: true,
-    data: { authorizationUrl, reference, isPartial, remainingUsdc: circle.contributionUsdc },
+    data: {
+      authorizationUrl,
+      reference,
+      remainingUsdc: remainingUsdc.toFixed(7),
+      topUpUsdc,
+    },
   });
 });

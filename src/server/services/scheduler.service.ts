@@ -210,6 +210,24 @@ export async function processDueCycles(): Promise<void> {
       );
       if (existing.length > 0) continue;
 
+      // Gate: only proceed if all active members have a confirmed contribution this cycle
+      const { rows: unpaid } = await query(
+        `SELECT m.id FROM members m
+         WHERE m.circle_id = $1 AND m.status = 'active'
+           AND NOT EXISTS (
+             SELECT 1 FROM contributions c
+             WHERE c.member_id = m.id
+               AND c.cycle_number = $2
+               AND c.status = 'confirmed'
+           )`,
+        [circle.id, circle.currentCycle]
+      );
+
+      if (unpaid.length > 0) {
+        console.log(`[scheduler] Skipping payout for circle ${circle.id} — ${unpaid.length} member(s) have not fully paid`);
+        continue;
+      }
+
       await addPayoutJob(circle.id, circle.currentCycle);
       console.log(`[scheduler] Enqueued payout job for circle ${circle.id} cycle ${circle.currentCycle}`);
     } catch (err) {
