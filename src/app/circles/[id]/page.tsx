@@ -11,6 +11,7 @@ import { CircleActions } from "@/components/circle/CircleActions";
 import { PayoutCountdown } from "@/components/circle/PayoutCountdown";
 import { PayoutHistory } from "@/components/circle/PayoutHistory";
 import { ContributionHistory } from "@/components/circle/ContributionHistory";
+import { CircleAdminTab } from "@/components/circle/CircleAdminTab";
 import { getCurrencySymbol, SupportedCurrency } from "@/lib/currency";
 import { format } from "date-fns";
 import type { Metadata } from "next";
@@ -64,6 +65,8 @@ export default async function CircleDetailPage({ params }: Props) {
   if (!circle) notFound();
 
   const userId = (session?.user as { id?: string } | undefined)?.id;
+  const userRole = (session?.user as { role?: string } | undefined)?.role;
+  const isAdmin = userRole === "admin";
   const isCreator = userId === circle.creatorId;
   const isMember = members.some((m) => m.userId === userId);
   const isActiveMember = members.some((m) => m.userId === userId && m.status === "active");
@@ -170,6 +173,13 @@ export default async function CircleDetailPage({ params }: Props) {
 
           <MemberPayoutList circle={circle} initialMembers={members} isCreator={isCreator} currentUserId={userId} />
         </div>
+
+        {isAdmin && (
+          <div className="card" style={{ marginTop: "var(--space-6)" }}>
+            <h2 className={styles.sectionTitle}>Admin: Circle Management</h2>
+            <CircleAdminTab circle={circle} />
+          </div>
+        )}
 
         {userId && (
           <LazyCircleChat circleId={circle.id} isActiveMember={isActiveMember} currentUserId={userId} />
