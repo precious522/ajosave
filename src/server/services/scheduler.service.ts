@@ -90,8 +90,30 @@ export async function processMissedContributions(): Promise<void> {
           [userId]
         );
 
-        // Send notification
+        // Apply configurable penalty (record in penalties table)
+        try {
+          const penaltyPercent = Number((circle as any).penalty_percent ?? (circle as any).penaltyPercent ?? 10);
+          const penaltyAmount = (parseFloat(circle.contributionUsdc) * (penaltyPercent / 100)).toFixed(7);
+          await query(
+            `INSERT INTO penalties (circle_id, member_id, cycle_number, amount_usdc, created_at)
+             VALUES ($1,$2,$3,$4,NOW())`,
+            [circle.id, memberId, circle.currentCycle, penaltyAmount]
+          );
+        } catch (err) {
+          console.error("Failed to record penalty for defaulted member:", err);
+        }
+
+        // Send notification to member and notify creator (admin)
         await notifyMissedContribution(userId, circle.name, circle.contributionUsdc);
+        try {
+          const creatorId = (circle as any).creator_id ?? (circle as any).creatorId;
+          if (creatorId) {
+            const { notifyAdminOfDefault } = await import("@/server/services/notification.service");
+            await notifyAdminOfDefault(creatorId, userId, circle.name, (parseFloat(circle.contributionUsdc) * (Number((circle as any).penalty_percent ?? (circle as any).penaltyPercent ?? 10) / 100)).toFixed(7));
+          }
+        } catch (err) {
+          console.error("Failed to notify circle admin about default:", err);
+        }
       }
     } catch (error) {
       console.error(`Failed to process missed contributions for circle ${circle.id}:`, error);

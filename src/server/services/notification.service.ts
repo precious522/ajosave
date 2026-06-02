@@ -195,6 +195,27 @@ export async function toggleSmsNotifications(
 }
 
 /**
+ * Notify circle creator (admin) that a member defaulted and a penalty was recorded.
+ */
+export async function notifyAdminOfDefault(
+  adminUserId: string,
+  defaulterUserId: string,
+  circleName: string,
+  penaltyAmount: string
+): Promise<void> {
+  if (!(await canSendSms(adminUserId))) return;
+  const phone = await getUserPhone(adminUserId);
+  if (!phone) return;
+
+  try {
+    const message = `Ajosave: A member defaulted in "${circleName}". Penalty of ${penaltyAmount} USDC recorded.`;
+    await sendSms(phone, message);
+  } catch (error) {
+    console.error(`Failed to notify admin ${adminUserId} about default:`, error);
+  }
+}
+
+/**
  * Notify all circle members when the circle completes (all payouts done)
  */
 export async function notifyCircleCompleted(

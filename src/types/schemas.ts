@@ -14,6 +14,8 @@ export const createCircleSchema = z.object({
   circleType: z.enum(["public", "private"]).default("public"),
   gracePeriodHours: z.number().int().min(0).max(168).default(24),
   payoutMethod: z.enum(["fixed", "randomized"]).default("fixed"),
+  yieldStrategy: z.enum(["none", "blend"]).default("none"),
+  penaltyPercent: z.number().int().min(0).max(100).default(10),
 });
 
 export const joinCircleSchema = z.object({

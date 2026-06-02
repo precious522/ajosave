@@ -15,6 +15,8 @@ const FORM_DEFAULTS: Partial<CreateCircleInput> = {
   cycleFrequency: "monthly",
   circleType: "public",
   contributionCurrency: "NGN",
+  yieldStrategy: "none",
+  penaltyPercent: 10,
 };
 
 function useUsdcPreview(amount: number | undefined, currency: string) {

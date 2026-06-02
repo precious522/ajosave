@@ -40,6 +40,8 @@ export interface Circle {
   nextPayoutAt?: Date;
   pausedAt?: Date | null;
   minReputation?: number; // minimum reputation score required to join (0-100)
+  yieldStrategy?: "none" | "blend";
+  penaltyPercent?: number;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null; // soft delete timestamp

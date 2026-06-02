@@ -23,6 +23,8 @@ const CIRCLE_SELECT = `
   payout_method as "payoutMethod", 
   randomization_seed as "randomizationSeed",
   grace_period_hours as "gracePeriodHours",
+  yield_strategy as "yieldStrategy",
+  penalty_percent as "penaltyPercent",
   status, contract_id as "contractId", 
   current_cycle as "currentCycle", 
   (SELECT COUNT(*)::int FROM members WHERE circle_id = circles.id AND status = 'active') as "memberCount",
@@ -58,11 +60,11 @@ export async function createCircle(
   const { rows } = await query<Circle>(
     `INSERT INTO circles
        (id, name, creator_id, contribution_usdc, contribution_fiat, contribution_currency,
-        max_members, cycle_frequency, payout_method, contract_id, grace_period_hours, status, current_cycle, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'open',0,NOW(),NOW())
+        max_members, cycle_frequency, payout_method, randomization_seed, yield_strategy, penalty_percent, contract_id, grace_period_hours, status, current_cycle, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'open',0,NOW(),NOW())
      RETURNING ${CIRCLE_SELECT}`,
     [id, input.name, creatorId, contributionUsdc, input.contributionAmount, input.contributionCurrency,
-     input.maxMembers, input.cycleFrequency, input.payoutMethod, contractId, input.gracePeriodHours ?? 24]
+     input.maxMembers, input.cycleFrequency, input.payoutMethod, null, input.yieldStrategy, input.penaltyPercent, contractId, input.gracePeriodHours ?? 24]
   );
   return rows[0];
 }
@@ -164,6 +166,9 @@ export async function getCirclesByUser(userId: string): Promise<Circle[]> {
         c.cycle_frequency as "cycleFrequency", 
         c.payout_method as "payoutMethod", 
         c.randomization_seed as "randomizationSeed",
+        c.grace_period_hours as "gracePeriodHours",
+        c.yield_strategy as "yieldStrategy",
+        c.penalty_percent as "penaltyPercent",
         c.status, c.contract_id as "contractId", 
         c.current_cycle as "currentCycle", 
         c.next_payout_at as "nextPayoutAt", 
