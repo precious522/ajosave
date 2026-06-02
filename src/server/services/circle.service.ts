@@ -6,6 +6,48 @@ import { getFiatPerUsdc } from "@/lib/fx";
 import { deployAjoContract } from "@/lib/soroban";
 import { sendUsdcPayment } from "@/lib/stellar";
 import { notifyCircleCancelled, notifyCirclePaused, notifyCircleResumed } from "./notification.service";
+import { getRedis } from "@/lib/redis";
+import logger from "@/lib/logger";
+
+const CACHE_KEY = "circles:open";
+const CACHE_TTL = 30; // seconds
+
+async function getCached<T>(key: string): Promise<T | null> {
+  try {
+    const redis = await getRedis();
+    const raw = await redis.get(key);
+    if (raw) {
+      logger.info({ key }, "cache hit");
+      return JSON.parse(raw) as T;
+    }
+    logger.info({ key }, "cache miss");
+  } catch (err) {
+    logger.warn({ err, key }, "Redis get failed, falling through to DB");
+  }
+  return null;
+}
+
+async function setCached(key: string, value: unknown): Promise<void> {
+  try {
+    const redis = await getRedis();
+    await redis.set(key, JSON.stringify(value), { EX: CACHE_TTL });
+  } catch (err) {
+    logger.warn({ err, key }, "Redis set failed");
+  }
+}
+
+async function invalidateCache(pattern: string): Promise<void> {
+  try {
+    const redis = await getRedis();
+    const keys = await redis.keys(pattern);
+    if (keys.length > 0) {
+      await redis.del(keys);
+    }
+    logger.info({ pattern }, "cache invalidated");
+  } catch (err) {
+    logger.warn({ err, pattern }, "Redis del failed");
+  }
+}
 
 export const fiatToUsdc = async (amount: number, currency: string): Promise<string> => {
   const rate = await getFiatPerUsdc(currency);
@@ -66,6 +108,7 @@ export async function createCircle(
     [id, input.name, creatorId, contributionUsdc, input.contributionAmount, input.contributionCurrency,
      input.maxMembers, input.cycleFrequency, input.payoutMethod, null, input.yieldStrategy, input.penaltyPercent, contractId, input.gracePeriodHours ?? 24]
   );
+  await invalidateCache(`${CACHE_KEY}:*`);
   return rows[0];
 }
 
@@ -100,6 +143,10 @@ export async function listOpenCircles(
 ): Promise<PaginatedCircles> {
   const safePage = Math.max(1, page);
   const safeLimit = Math.min(100, Math.max(1, limit));
+
+  const cacheKey = `${CACHE_KEY}:${JSON.stringify({ page: safePage, limit: safeLimit, ...filters })}`;
+  const cached = await getCached<PaginatedCircles>(cacheKey);
+  if (cached) return cached;
   const offset = (safePage - 1) * safeLimit;
 
   const statusFilter: CircleStatus = filters.status ?? 'open';
@@ -152,7 +199,9 @@ export async function listOpenCircles(
     query<{ count: string }>(countQueryText, queryParams),
   ]);
 
-  return { data: rows, total: parseInt(countRows[0].count, 10), page: safePage, limit: safeLimit };
+  const result = { data: rows, total: parseInt(countRows[0].count, 10), page: safePage, limit: safeLimit };
+  await setCached(cacheKey, result);
+  return result;
 }
 
 export async function getCirclesByUser(userId: string): Promise<Circle[]> {
@@ -188,7 +237,7 @@ export async function joinCircle(
   userId: string,
   isInvited: boolean = false
 ): Promise<Member> {
-  return transaction(async (q) => {
+  const member = await transaction(async (q) => {
     const { rows: circleRows } = await q<Circle>(
       `SELECT ${CIRCLE_SELECT} FROM circles WHERE id = $1 FOR UPDATE`,
       [circleId]
@@ -252,6 +301,8 @@ export async function joinCircle(
 
     return newMember[0];
   });
+  await invalidateCache(`${CACHE_KEY}:*`);
+  return member;
 }
 
 export async function getMembersByCircle(circleId: string): Promise<Member[]> {
@@ -267,6 +318,7 @@ export async function updateCircleStatus(id: string, status: CircleStatus): Prom
     "UPDATE circles SET status=$1, updated_at=NOW() WHERE id=$2",
     [status, id]
   );
+  await invalidateCache(`${CACHE_KEY}:*`);
 }
 
 export async function shuffleAndPersistPositions(
@@ -504,6 +556,8 @@ export async function cancelCircle(
     return updated[0];
   });
 
+  await invalidateCache(`${CACHE_KEY}:*`);
+
   // ── Step 2: Fetch members with refund_pending contributions ────────────────
   const { rows: refundRows } = await query<{
     member_id: string;
@@ -601,7 +655,7 @@ export async function pauseCircle(
   circleId: string,
   creatorId: string
 ): Promise<Circle> {
-  return transaction(async (q) => {
+  const result = await transaction(async (q) => {
     const { rows } = await q<Circle>(
       `SELECT ${CIRCLE_SELECT} FROM circles WHERE id = $1 FOR UPDATE`,
       [circleId]
@@ -628,13 +682,15 @@ export async function pauseCircle(
 
     return updated[0];
   });
+  await invalidateCache(`${CACHE_KEY}:*`);
+  return result;
 }
 
 export async function resumeCircle(
   circleId: string,
   creatorId: string
 ): Promise<Circle> {
-  return transaction(async (q) => {
+  const result = await transaction(async (q) => {
     const { rows } = await q<Circle>(
       `SELECT ${CIRCLE_SELECT} FROM circles WHERE id = $1 FOR UPDATE`,
       [circleId]
@@ -671,6 +727,8 @@ export async function resumeCircle(
 
     return updated[0];
   });
+  await invalidateCache(`${CACHE_KEY}:*`);
+  return result;
 }
 
 /**

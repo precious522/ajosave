@@ -12,6 +12,7 @@ import * as db from "@/lib/db";
 import * as soroban from "@/lib/soroban";
 import * as fx from "@/lib/fx";
 import * as stellar from "@/lib/stellar";
+import * as redis from "@/lib/redis";
 
 jest.mock("@/lib/db", () => ({
   query: jest.fn(),
@@ -26,6 +27,21 @@ jest.mock("@/lib/stellar", () => ({
 jest.mock("@/server/services/notification.service", () => ({
   notifyCircleCancelled: jest.fn().mockResolvedValue(undefined),
 }));
+
+const mockRedisGet = jest.fn();
+const mockRedisSet = jest.fn();
+const mockRedisDel = jest.fn();
+const mockRedisKeys = jest.fn();
+const mockRedisClient = {
+  get: mockRedisGet,
+  set: mockRedisSet,
+  del: mockRedisDel,
+  keys: mockRedisKeys,
+};
+jest.mock("@/lib/redis", () => ({
+  getRedis: jest.fn(),
+}));
+const mockGetRedis = redis.getRedis as jest.MockedFunction<typeof redis.getRedis>;
 
 const mockQuery = db.query as jest.MockedFunction<typeof db.query>;
 const mockTransaction = db.transaction as jest.MockedFunction<typeof db.transaction>;
@@ -131,6 +147,12 @@ beforeEach(() => {
   mockSendUsdcPayment.mockResolvedValue("refund-tx-hash");
   mockValidateStellarRecipient.mockResolvedValue(undefined);
   mockTransaction.mockImplementation(async (cb) => cb(mockQuery));
+  // Default: Redis returns no cached value
+  mockRedisGet.mockResolvedValue(null);
+  mockRedisSet.mockResolvedValue("OK");
+  mockRedisKeys.mockResolvedValue([]);
+  mockRedisDel.mockResolvedValue(1);
+  mockGetRedis.mockResolvedValue(mockRedisClient as any);
 });
 
 describe("circle.service", () => {
@@ -393,6 +415,100 @@ describe("circle.service", () => {
         expect.stringContaining("SET status = 'refunded'"),
         expect.anything()
       );
+    });
+  });
+
+  describe("Redis caching", () => {
+    const PAGINATED_RESULT = { data: [MOCK_CIRCLE], total: 1, page: 1, limit: 20 };
+
+    describe("listOpenCircles", () => {
+      it("returns cached result on cache hit without querying DB", async () => {
+        mockRedisGet.mockResolvedValue(JSON.stringify(PAGINATED_RESULT));
+
+        const result = await listOpenCircles();
+
+        expect(result).toEqual(PAGINATED_RESULT);
+        expect(mockQuery).not.toHaveBeenCalled();
+      });
+
+      it("queries DB and populates cache on cache miss", async () => {
+        mockRedisGet.mockResolvedValue(null);
+        mockQuery
+          .mockResolvedValueOnce({ rows: [MOCK_CIRCLE], rowCount: 1 } as any)
+          .mockResolvedValueOnce({ rows: [{ count: "1" }], rowCount: 1 } as any);
+
+        const result = await listOpenCircles();
+
+        expect(result).toEqual(PAGINATED_RESULT);
+        expect(mockQuery).toHaveBeenCalledTimes(2);
+        expect(mockRedisSet).toHaveBeenCalledWith(
+          expect.stringContaining("circles:open:"),
+          JSON.stringify(PAGINATED_RESULT),
+          { EX: 30 }
+        );
+      });
+
+      it("falls through to DB when Redis get throws", async () => {
+        mockRedisGet.mockRejectedValue(new Error("Redis unavailable"));
+        mockQuery
+          .mockResolvedValueOnce({ rows: [MOCK_CIRCLE], rowCount: 1 } as any)
+          .mockResolvedValueOnce({ rows: [{ count: "1" }], rowCount: 1 } as any);
+
+        const result = await listOpenCircles();
+
+        expect(result).toEqual(PAGINATED_RESULT);
+        expect(mockQuery).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe("cache invalidation", () => {
+      it("invalidates cache after createCircle", async () => {
+        mockRedisKeys.mockResolvedValue(["circles:open:{}"] as any);
+        jest.spyOn(soroban, "deployAjoContract").mockResolvedValue("CONTRACT_ID");
+        mockQuery.mockResolvedValue({ rows: [MOCK_CIRCLE], rowCount: 1 } as any);
+
+        await createCircle(CREATOR_ID, {
+          name: "New Circle",
+          contributionAmount: 16000,
+          contributionCurrency: "NGN" as const,
+          maxMembers: 5,
+          cycleFrequency: "monthly" as const,
+          payoutMethod: "fixed" as const,
+        });
+
+        expect(mockRedisKeys).toHaveBeenCalledWith("circles:open:*");
+        expect(mockRedisDel).toHaveBeenCalledWith(["circles:open:{}"]);
+      });
+
+      it("invalidates cache after joinCircle", async () => {
+        mockRedisKeys.mockResolvedValue(["circles:open:{}"] as any);
+        mockQuery
+          .mockResolvedValueOnce({ rows: [MOCK_CIRCLE], rowCount: 1 } as any)
+          .mockResolvedValueOnce({ rows: [], rowCount: 0 } as any)
+          .mockResolvedValueOnce({ rows: [MOCK_MEMBER], rowCount: 1 } as any);
+
+        await joinCircle(CIRCLE_ID, USER_ID);
+
+        expect(mockRedisKeys).toHaveBeenCalledWith("circles:open:*");
+        expect(mockRedisDel).toHaveBeenCalled();
+      });
+
+      it("does not throw when Redis del fails during invalidation", async () => {
+        mockRedisKeys.mockResolvedValue(["circles:open:{}"] as any);
+        mockRedisDel.mockRejectedValue(new Error("Redis unavailable"));
+        mockQuery.mockResolvedValue({ rows: [MOCK_CIRCLE], rowCount: 1 } as any);
+
+        await expect(
+          createCircle(CREATOR_ID, {
+            name: "New Circle",
+            contributionAmount: 16000,
+            contributionCurrency: "NGN" as const,
+            maxMembers: 5,
+            cycleFrequency: "monthly" as const,
+            payoutMethod: "fixed" as const,
+          })
+        ).resolves.toBeDefined();
+      });
     });
   });
 });
