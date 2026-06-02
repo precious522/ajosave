@@ -9,6 +9,33 @@ import { usePolling } from "@/hooks/usePolling";
 import Link from "next/link";
 import styles from "./LiveDashboard.module.css";
 
+function ExportCSVButton() {
+  const [loading, setLoading] = useState(false);
+
+  async function handleExport() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/user/contributions/export");
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `contributions-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button onClick={handleExport} disabled={loading} className="btn btn--secondary btn--sm">
+      {loading ? "Exporting…" : "Export CSV"}
+    </button>
+  );
+}
+
 interface LiveDashboardProps {
   initialCircles: Circle[];
 }
@@ -56,6 +83,7 @@ export function LiveDashboard({ initialCircles }: LiveDashboardProps) {
         <h1 className={styles.title}>My Circles</h1>
         <div className={styles.headerActions}>
           <ConnectionStatus isConnected={isConnected} lastUpdate={lastUpdate || undefined} />
+          <ExportCSVButton />
           <Link href="/circles/create" className="btn btn--accent">
             + New Circle
           </Link>
