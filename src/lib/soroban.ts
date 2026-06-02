@@ -1,5 +1,6 @@
 import { contract, Keypair, Networks } from "@stellar/stellar-sdk";
 import { serverConfig } from "@/server/config";
+import { wrapWithFeeBump } from "@/lib/stellar";
 import { execSync } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
@@ -191,10 +192,9 @@ export async function invokeContractPayout(contractId: string): Promise<string> 
   // payout() takes no args — admin auth is checked inside the contract
   // @ts-expect-error — method generated from contract ABI at runtime
   const assembled = await client.payout();
-  const sent = await assembled.send();
-  // SentTransaction exposes the hash via the underlying getTransaction response
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (sent as any).hash ?? (sent as any).sendTransactionResponse?.hash ?? "";
+  // Wrap the inner transaction in a platform fee bump so users need no XLM
+  const innerXdr: string = assembled.toXDR();
+  return wrapWithFeeBump(innerXdr);
 }
 
 /**
@@ -223,7 +223,7 @@ export async function invokeContractSetPayoutOrder(
   // set_payout_order(order: Vec<u32>)
   // @ts-expect-error — method generated from contract ABI at runtime
   const assembled = await client.set_payout_order({ order: payoutOrder });
-  const sent = await assembled.send();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (sent as any).hash ?? (sent as any).sendTransactionResponse?.hash ?? "";
+  // Wrap the inner transaction in a platform fee bump so users need no XLM
+  const innerXdr: string = assembled.toXDR();
+  return wrapWithFeeBump(innerXdr);
 }

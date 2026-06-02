@@ -3,6 +3,7 @@ import {
   Keypair,
   Asset,
   TransactionBuilder,
+  Transaction,
   Operation,
   BASE_FEE,
   Networks,
@@ -214,6 +215,30 @@ export async function validateStellarRecipient(publicKey: string): Promise<void>
   if (!hasUsdcTrustline(account)) {
     throw new Error(`Recipient account has no USDC trustline: ${publicKey}`);
   }
+}
+
+/**
+ * Wraps a signed inner transaction in a fee bump so the platform pays the fee.
+ * The inner transaction must already be signed by the user's keypair.
+ * The platform keypair signs the outer fee bump envelope.
+ *
+ * @param innerTxXdr - XDR of the signed inner transaction
+ * @returns The submitted fee bump transaction hash
+ */
+export async function wrapWithFeeBump(innerTxXdr: string): Promise<string> {
+  const feeKeypair = Keypair.fromSecret(serverConfig.stellar.serverSecretKey);
+  const innerTx = TransactionBuilder.fromXDR(innerTxXdr, networkPassphrase) as Transaction;
+
+  const feeBump = TransactionBuilder.buildFeeBumpTransaction(
+    feeKeypair,
+    BASE_FEE,
+    innerTx,
+    networkPassphrase
+  );
+  feeBump.sign(feeKeypair);
+
+  const result = await server.submitTransaction(feeBump);
+  return result.hash;
 }
 
 export { server as horizonServer, USDC, networkPassphrase };
