@@ -8,6 +8,9 @@ import { SessionProvider } from "next-auth/react";
 import { Analytics } from "@vercel/analytics/react";
 import { SentryUserContext } from "@/components/SentryUserContext";
 import { PWAProvider } from "@/components/PWAProvider";
+import { IntlProvider } from "@/components/IntlProvider";
+import { cookies } from "next/headers";
+import { locales, defaultLocale, type Locale } from "@/i18n";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -36,9 +39,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = cookies();
+  const rawLocale = cookieStore.get("locale")?.value ?? defaultLocale;
+  const locale: Locale = locales.includes(rawLocale as Locale) ? (rawLocale as Locale) : defaultLocale;
+  const messages = (await import(`../../messages/${locale}.json`)).default;
+
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang={locale} className={inter.variable}>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -48,13 +56,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <SessionProvider>
-          <a href="#main-content" className="skip-link">Skip to main content</a>
-          <SentryUserContext />
-          <Navbar />
-          <main id="main-content">{children}</main>
-          <Footer />
-          <PWAProvider />
-          <Analytics />
+          <IntlProvider locale={locale} messages={messages}>
+            <a href="#main-content" className="skip-link">Skip to main content</a>
+            <SentryUserContext />
+            <Navbar />
+            <main id="main-content">{children}</main>
+            <Footer />
+            <PWAProvider />
+            <Analytics />
+          </IntlProvider>
         </SessionProvider>
       </body>
     </html>

@@ -3,17 +3,21 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import styles from "./PayoutHistory.module.css";
-import type { ContributionRow } from "@/app/api/circles/[id]/contributions/route";
+import type { ContributionRow } from "@/server/services/contribution.service";
 
-interface Props { circleId: string }
+interface Props {
+  circleId: string;
+  initialData?: { data: ContributionRow[]; total: number };
+}
 
-export function ContributionHistory({ circleId }: Props) {
-  const [rows, setRows] = useState<ContributionRow[] | null>(null);
+export function ContributionHistory({ circleId, initialData }: Props) {
+  const [rows, setRows] = useState<ContributionRow[] | null>(initialData?.data ?? null);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState<number | null>(null);
+  const [total, setTotal] = useState<number | null>(initialData?.total ?? null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (initialData) return;
     setRows(null);
     setError(null);
     fetch(`/api/circles/${circleId}/contributions?page=${page}&limit=20`)
@@ -24,7 +28,7 @@ export function ContributionHistory({ circleId }: Props) {
         setTotal(json.data.total);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load contributions"));
-  }, [circleId, page]);
+  }, [circleId, page, initialData]);
 
   if (error) return <p className={styles.error}>{error}</p>;
 

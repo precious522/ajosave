@@ -120,7 +120,23 @@ describe("POST /api/webhooks/paystack", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.duplicate).toBe(true);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining("INTERVAL '24 HOURS'"),
+      ["evt_123"]
+    );
     expect(mockQuery).toHaveBeenCalledTimes(1);
     expect(mockTransaction).not.toHaveBeenCalled();
+  });
+
+  it("marks contribution as failed on charge.failed", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 } as any);
+
+    const req = makeRequest({ event: "charge.failed", data: { reference: "ajo-circle-1-member-1-2" } });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining("status = 'failed'"),
+      ["ajo-circle-1-member-1-2"]
+    );
   });
 });

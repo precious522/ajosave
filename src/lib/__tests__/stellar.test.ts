@@ -5,6 +5,8 @@ import {
   horizonServer,
   sendUsdcPayment,
   validateStellarRecipient,
+  getCurrentBaseFee,
+  calculatePriorityFee,
 } from "../stellar";
 import logger from "../logger";
 
@@ -222,5 +224,33 @@ describe("USDC trustline checks", () => {
       "Invalid Stellar public key"
     );
     expect(horizonServer.loadAccount).not.toHaveBeenCalled();
+  });
+
+  it("calculates a capped priority fee correctly", () => {
+    expect(calculatePriorityFee(100)).toBe(200);
+    expect(calculatePriorityFee(150)).toBe(300);
+  });
+
+  it("uses the configured cap when lower than priority fee", () => {
+    const { serverConfig } = require("@/server/config");
+    const originalCap = serverConfig.stellar.maxFeeCap;
+    serverConfig.stellar.maxFeeCap = 120;
+
+    expect(calculatePriorityFee(100)).toBe(120);
+
+    serverConfig.stellar.maxFeeCap = originalCap;
+  });
+
+  it("fetches base fee from Horizon fee stats", async () => {
+    (horizonServer.feeStats as jest.Mock) = jest.fn().mockResolvedValue({
+      fee_charged: { mode: "123", min: "100", p50: "110" },
+    });
+
+    await expect(getCurrentBaseFee()).resolves.toBe(123);
+  });
+
+  it("falls back to BASE_FEE on fee stats failures", async () => {
+    (horizonServer.feeStats as jest.Mock) = jest.fn().mockRejectedValue(new Error("Horizon down"));
+    await expect(getCurrentBaseFee()).resolves.toBe(100);
   });
 });

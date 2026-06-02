@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withErrorHandler } from "@/server/middleware";
+import { withErrorHandler, withRateLimit } from "@/server/middleware";
 import { verifyRefreshToken, revokeRefreshToken, generateRefreshToken, getTokenExpiries } from "@/lib/refresh-tokens";
 import { query } from "@/lib/db";
 import { SignJWT } from "jose";
@@ -27,7 +27,8 @@ const SECRET = new TextEncoder().encode(serverConfig.authSecret);
  *   }
  * }
  */
-export const POST = withErrorHandler(async (req: NextRequest) => {
+export const POST = withRateLimit(
+  withErrorHandler(async (req: NextRequest) => {
   try {
     const body = await req.json();
     const refreshToken = body.refreshToken as string;
@@ -117,4 +118,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       { status: 500 }
     );
   }
-});
+  }),
+  { limit: 5, windowMs: 60_000 }
+);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withErrorHandler } from "@/server/middleware";
+import { withErrorHandler, withRateLimit } from "@/server/middleware";
 import { verifyOtpSchema } from "@/types/schemas";
 import { getRedis } from "@/lib/redis";
 import { getLockoutStatus, recordFailure, resetLockout } from "@/lib/lockout";
@@ -75,7 +75,8 @@ interface VerifyOtpResponse {
  *   }
  * }
  */
-export const POST = withErrorHandler(async (req: NextRequest) => {
+export const POST = withRateLimit(
+  withErrorHandler(async (req: NextRequest) => {
   try {
     const body = await req.json();
     const parsed = verifyOtpSchema.safeParse(body);
@@ -184,4 +185,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       { status: 500 }
     );
   }
-});
+  }),
+  { limit: 5, windowMs: 60_000 }
+);

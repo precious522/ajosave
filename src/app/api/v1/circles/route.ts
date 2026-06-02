@@ -7,7 +7,7 @@ import { withErrorHandler, withRateLimit } from "@/server/middleware";
 import type { ApiResponse, Circle } from "@/types";
 import type { PaginatedCircles } from "@/server/services/circle.service";
 
-export const GET = withErrorHandler(async (req: NextRequest) => {
+export const GET = withRateLimit(withErrorHandler(async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const filter = searchParams.get("filter");
 
@@ -43,7 +43,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     status,
   });
   return NextResponse.json<ApiResponse<PaginatedCircles>>({ success: true, data: result });
-});
+}));
 
 export const POST = withRateLimit(
   withErrorHandler(async (req: NextRequest) => {

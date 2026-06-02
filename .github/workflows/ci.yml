@@ -34,11 +34,37 @@ jobs:
       fail-fast: true
       matrix:
         node-version: [20, 22]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ajosave
+          POSTGRES_PASSWORD: ajosave
+          POSTGRES_DB: ajosave_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://ajosave:ajosave@localhost:5432/ajosave_test
+      REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "${{ matrix.node-version }}", cache: npm }
       - run: npm ci
+      - name: Run migrations before tests
+        run: npm run migrate
       - name: Run tests with coverage
         run: npm run test:coverage -- --ci
       - name: Upload coverage to Codecov
@@ -157,6 +183,108 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  visual-regression:
+    name: Visual Regression Tests
+    runs-on: ubuntu-latest
+    needs: [build]
+    env:
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_NAME: Ajosave
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ci-secret-placeholder
+      DATABASE_URL: postgresql://user:password@localhost:5432/ajosave
+      STELLAR_NETWORK: testnet
+      STELLAR_HORIZON_URL: https://horizon-testnet.stellar.org
+      STELLAR_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
+      STELLAR_SERVER_SECRET_KEY: SXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      USDC_ISSUER: GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+      USDC_ASSET_CODE: USDC
+      PAYSTACK_SECRET_KEY: sk_test_placeholder
+      TERMII_API_KEY: placeholder
+      REDIS_URL: redis://localhost:6379
+      CRON_SECRET: placeholder
+      NEXT_PUBLIC_SENTRY_DSN: ""
+      SENTRY_DSN: ""
+      SENTRY_ORG: ajosave
+      SENTRY_PROJECT: ajosave-nextjs
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch full history so baseline snapshots committed on main are available
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Next.js
+        run: npm run build
+
+      - name: Start Next.js server
+        run: npx next start &
+        env:
+          PORT: 3000
+
+      - name: Wait for server to be ready
+        run: npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Run visual regression tests
+        id: visual_tests
+        # --project flags target only the visual projects defined in playwright.config.ts
+        run: |
+          npx playwright test \
+            --project=visual-desktop \
+            --project=visual-mobile \
+            --reporter=github,html
+        continue-on-error: true
+
+      - name: Upload screenshot baselines & diffs as CI artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-report
+          # Includes the HTML report, diff images, and actual screenshots
+          path: |
+            playwright-report/
+            e2e/visual/__snapshots__/
+          retention-days: 30
+
+      # Post a comment on the PR with a link to the diff report when tests fail
+      - name: Comment diff report link on PR
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: [
+                "## 🖼️ Visual Regression Failures Detected",
+                "",
+                "One or more screenshots differ from the baseline by more than **0.1%**.",
+                "",
+                `[View diff images in the CI artifact →](${runUrl})`,
+                "",
+                "To update baselines locally, run:",
+                "```bash",
+                "npx playwright test --project=visual-desktop --project=visual-mobile --update-snapshots",
+                "```",
+                "Then commit the updated snapshots.",
+              ].join("\n"),
+            });
+
+      # Fail the job after the comment has been posted
+      - name: Fail if visual tests failed
+        if: steps.visual_tests.outcome == 'failure'
+        run: exit 1
 
   contract-test:
     name: Soroban Contract Tests

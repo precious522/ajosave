@@ -151,3 +151,34 @@ export function withRateLimit(
     return response;
   };
 }
+
+const IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60; // 24 hours
+
+/**
+ * Idempotency middleware for payment endpoints.
+ * Reads X-Idempotency-Key header, returns cached response for duplicate keys.
+ * Caches the response body + status in Redis for 24h.
+ */
+export function withIdempotency(handler: Handler): Handler {
+  return async (req, ctx) => {
+    const key = req.headers.get("x-idempotency-key");
+    if (!key) return handler(req, ctx);
+
+    const redis = await getRedis();
+    const redisKey = `idempotency:${key}`;
+
+    const cached = await redis.get(redisKey);
+    if (cached) {
+      const { status, body } = JSON.parse(cached);
+      return NextResponse.json(body, { status });
+    }
+
+    const response = await handler(req, ctx);
+    const body = await response.clone().json();
+    await redis.set(redisKey, JSON.stringify({ status: response.status, body }), {
+      EX: IDEMPOTENCY_TTL_SECONDS,
+    });
+
+    return response;
+  };
+}

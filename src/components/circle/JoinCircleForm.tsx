@@ -20,10 +20,10 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [optimisticJoined, setOptimisticJoined] = useState(false);
   const [noSavedKey, setNoSavedKey] = useState(false);
   const [stellarPublicKey, setStellarPublicKey] = useState("");
   const [optimisticCount, setOptimisticCount] = useState(circle.memberCount ?? 0);
-  const [noSavedKey, setNoSavedKey] = useState(false);
   const [hasUsdcTrustline, setHasUsdcTrustline] = useState<boolean | null>(null);
 
   const { connectionState, publicKey, error: walletError, connect, disconnect } = useFreighterWallet();
@@ -73,7 +73,8 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
     setLoading(true);
     setError(null);
 
-    // Optimistic update: increment member count immediately
+    // Optimistic updates: show joined state and increment member count immediately
+    setOptimisticJoined(true);
     setOptimisticCount((c) => c + 1);
 
     try {
@@ -88,12 +89,13 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
 
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
-      try { (await import('@vercel/analytics')).event('circle_joined', { circleId: circle.id }); } catch {}
+      try { (await import('@vercel/analytics')).track('circle_joined', { circleId: circle.id }); } catch {}
 
       router.push(`/circles/${circle.id}?joined=true`);
       router.refresh();
     } catch (err) {
-      // Revert optimistic update on error
+      // Revert optimistic updates on error
+      setOptimisticJoined(false);
       setOptimisticCount((c) => c - 1);
       setError(err instanceof Error ? err.message : "Failed to join circle");
     } finally {
@@ -180,9 +182,9 @@ export function JoinCircleForm({ circle, token, inviteValid }: Props) {
           type="submit"
           className="btn--full"
           loading={loading}
-          disabled={loading}
+          disabled={loading || optimisticJoined}
         >
-          {circle.circleType === "private" && !inviteValid ? "Request to Join" : "Join Circle"}
+          {optimisticJoined ? "Joined ✓" : circle.circleType === "private" && !inviteValid ? "Request to Join" : "Join Circle"}
         </Button>
       </form>
     </div>

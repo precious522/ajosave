@@ -26,6 +26,8 @@ const DB_IDLE_TIMEOUT_MS = parseInt(process.env.DB_IDLE_TIMEOUT_MS ?? "30000", 1
 const DB_MAX_RETRIES = parseInt(process.env.DB_MAX_RETRIES ?? "3", 10);
 const DB_RETRY_DELAY_MS = parseInt(process.env.DB_RETRY_DELAY_MS ?? "500", 10);
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 let pool: Pool | null = null;
 
 function getPool(): Pool {
