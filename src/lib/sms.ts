@@ -1,6 +1,7 @@
 import axios from "axios";
 import { serverConfig } from "@/server/config";
 import { getCorrelationId } from "./correlation";
+import { getDb } from "./db";
 
 const client = axios.create({ baseURL: "https://api.ng.termii.com/api" });
 
@@ -10,21 +11,19 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
-export async function sendOtp(phone: string): Promise<string> {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  await client.post("/sms/send", {
-    to: phone,
-    from: serverConfig.termii.senderId,
-    sms: `Your Ajosave verification code is: ${otp}. Valid for 10 minutes.`,
-    type: "plain",
-    channel: "generic",
-    api_key: serverConfig.termii.apiKey,
-  });
-  return otp;
+async function logSms(phone: string, message: string, messageId: string | null): Promise<void> {
+  const db = await getDb();
+  await db.query(
+    `INSERT INTO sms_logs (phone, message, message_id, status)
+     VALUES ($1, $2, $3, 'pending')`,
+    [phone, message, messageId]
+  );
 }
 
-export async function sendSms(phone: string, message: string): Promise<void> {
-  await client.post("/sms/send", {
+export async function sendOtp(phone: string): Promise<string> {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const message = `Your Ajosave verification code is: ${otp}. Valid for 10 minutes.`;
+  const res = await client.post("/sms/send", {
     to: phone,
     from: serverConfig.termii.senderId,
     sms: message,
@@ -32,6 +31,20 @@ export async function sendSms(phone: string, message: string): Promise<void> {
     channel: "generic",
     api_key: serverConfig.termii.apiKey,
   });
+  await logSms(phone, message, res.data?.message_id ?? null);
+  return otp;
+}
+
+export async function sendSms(phone: string, message: string): Promise<void> {
+  const res = await client.post("/sms/send", {
+    to: phone,
+    from: serverConfig.termii.senderId,
+    sms: message,
+    type: "plain",
+    channel: "generic",
+    api_key: serverConfig.termii.apiKey,
+  });
+  await logSms(phone, message, res.data?.message_id ?? null);
 }
 
 export async function sendPayoutReminderSms(

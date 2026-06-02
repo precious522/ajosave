@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getCircleById, getMembersByCircle } from "@/server/services/circle.service";
+import { getCircleById, getMembersByCircle, deleteCircle } from "@/server/services/circle.service";
 import { getWaitlistStatus } from "@/server/services/waitlist.service";
 import { withErrorHandler } from "@/server/middleware";
 import type { ApiResponse, Circle, Member } from "@/types";
@@ -40,6 +40,6 @@ export const DELETE = withErrorHandler(async (_req: NextRequest, ctx: unknown) =
   }
   const { params } = ctx as { params: { id: string } };
   const userId = (session.user as { id: string }).id;
-  const circle = await softDeleteCircle(params.id, userId);
-  return NextResponse.json<ApiResponse<Circle>>({ success: true, data: circle });
+  await deleteCircle(params.id, userId);
+  return NextResponse.json<ApiResponse<{ deleted: true }>>({ success: true, data: { deleted: true } });
 });

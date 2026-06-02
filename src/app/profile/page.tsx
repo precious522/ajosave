@@ -16,7 +16,7 @@ export default function ProfilePage() {
   const { connectionState, publicKey, error: walletError, connect, disconnect } = useFreighterWallet();
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [form, setForm] = useState({ displayName: "", email: "", stellarPublicKey: "" });
+  const [form, setForm] = useState({ displayName: "", email: "", stellarPublicKey: "", smsNotificationsEnabled: true, emailNotificationsEnabled: true });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [referral, setReferral] = useState<ReferralData | null>(null);
@@ -43,6 +43,8 @@ export default function ProfilePage() {
             displayName: json.data.displayName ?? "",
             email: json.data.email ?? "",
             stellarPublicKey: json.data.stellarPublicKey ?? "",
+            smsNotificationsEnabled: json.data.smsNotificationsEnabled,
+            emailNotificationsEnabled: json.data.emailNotificationsEnabled,
           });
         }
       });
@@ -253,6 +255,33 @@ export default function ProfilePage() {
           )}
         </section>
 
+        {/* ── Notification preferences ── */}
+        <section className="card" style={{ marginBottom: "var(--space-6)" }}>
+          <h2 className={styles.sectionTitle}>Notification Preferences</h2>
+          <div className="input-group" style={{ marginBottom: "var(--space-3)" }}>
+            <label className="input-label">
+              <input
+                type="checkbox"
+                checked={form.smsNotificationsEnabled}
+                onChange={(e) => setForm((f) => ({ ...f, smsNotificationsEnabled: e.target.checked }))}
+                style={{ marginRight: "0.5rem" }}
+              />
+              SMS Notifications
+            </label>
+          </div>
+          <div className="input-group">
+            <label className="input-label">
+              <input
+                type="checkbox"
+                checked={form.emailNotificationsEnabled}
+                onChange={(e) => setForm((f) => ({ ...f, emailNotificationsEnabled: e.target.checked }))}
+                style={{ marginRight: "0.5rem" }}
+              />
+              Email Notifications
+            </label>
+          </div>
+        </section>
+
         {/* ── Editable fields ── */}
         <section className="card">
           <h2 className={styles.sectionTitle}>Edit Profile</h2>
@@ -293,7 +322,7 @@ export default function ProfilePage() {
                   setForm((f) => ({ ...f, stellarPublicKey: e.target.value }));
                   setStellarKeyError(null);
                 }}
-                placeholder="GXXXXXXX…"
+                placeholder="GXXXXXX…"
                 spellCheck={false}
               />
               {connectionState !== "not_installed" && (
@@ -306,7 +335,7 @@ export default function ProfilePage() {
               )}
               {connectionState === "not_installed" && (
                 <small className="input-hint">
-                  Don&apos;t have a Stellar wallet?{" "}
+                  Don't have a Stellar wallet?{" "}
                   <a href="https://freighter.app" target="_blank" rel="noopener noreferrer">
                     Install Freighter
                   </a>

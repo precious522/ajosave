@@ -1,0 +1,15 @@
+{
+  "ci": {
+    "collect": {
+      "url": ["http://localhost:8080"],
+      "startServerCommand": "npx serve out -l 8080"
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.85 }],
+        "categories:accessibility": ["error", { "minScore": 0.90 }]
+      }
+    },
+    "upload": { "target": "temporary-public-storage" }
+  }
+}

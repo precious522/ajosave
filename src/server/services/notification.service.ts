@@ -12,25 +12,34 @@ import {
   sendCirclePausedSms,
   sendCircleResumedSms,
 } from "@/lib/sms";
-import type { User } from "@/types";
+import {
+  sendPayoutReminderEmail,
+  sendPayoutProcessedEmail,
+  sendMissedContributionEmail,
+  sendContributionReminderEmail,
+  sendContributionReceivedEmail,
+  sendJoinRequestApprovedEmail,
+  sendJoinRequestRejectedEmail,
+  sendCircleCancelledEmail,
+  sendCirclePausedEmail,
+  sendCircleResumedEmail,
+  sendCircleCompletedEmail,
+} from "@/lib/email";
 
-async function canSendSms(userId: string): Promise<boolean> {
-  const { rows } = await query<{ smsNotificationsEnabled: boolean }>(
-    `SELECT sms_notifications_enabled as "smsNotificationsEnabled" FROM users WHERE id = $1`,
-    [userId]
-  );
-  return rows[0]?.smsNotificationsEnabled ?? false;
+interface UserDetails {
+  phone: string | null;
+  email: string | null;
+  displayName: string;
+  smsNotificationsEnabled: boolean;
+  emailNotificationsEnabled: boolean;
 }
 
-/**
- * Get user phone number
- */
-async function getUserPhone(userId: string): Promise<string | null> {
-  const { rows } = await query<User>(
-    "SELECT phone FROM users WHERE id = $1",
+async function getUserDetails(userId: string): Promise<UserDetails | null> {
+  const { rows } = await query(
+    "SELECT phone, email, display_name AS \"displayName\", sms_notifications_enabled AS \"smsNotificationsEnabled\", email_notifications_enabled AS \"emailNotificationsEnabled\" FROM users WHERE id = $1",
     [userId]
   );
-  return rows[0]?.phone ?? null;
+  return rows[0] || null;
 }
 
 /**
@@ -42,15 +51,28 @@ export async function notifyPayoutReminder(
   amount: string,
   hoursUntilPayout: number = 24
 ): Promise<void> {
-  if (!(await canSendSms(userId))) return;
-  
-  const phone = await getUserPhone(userId);
-  if (!phone) return;
+  const userDetails = await getUserDetails(userId);
+  if (!userDetails) return;
 
-  try {
-    await sendPayoutReminderSms(phone, circleName, amount, hoursUntilPayout);
-  } catch (error) {
-    console.error(`Failed to send payout reminder to ${userId}:`, error);
+  let sent = false;
+
+  // Try SMS first
+  if (userDetails.smsNotificationsEnabled && userDetails.phone) {
+    try {
+      await sendPayoutReminderSms(userDetails.phone, circleName, amount, hoursUntilPayout);
+      sent = true;
+    } catch (error) {
+      console.error(`Failed to send payout reminder SMS to ${userId}:`, error);
+    }
+  }
+
+  // Try email if enabled, has email, and either SMS failed or not sent
+  if (userDetails.emailNotificationsEnabled && userDetails.email) {
+    try {
+      await sendPayoutReminderEmail(userDetails.email, userDetails.displayName, circleName, amount, hoursUntilPayout, userId);
+    } catch (error) {
+      console.error(`Failed to send payout reminder email to ${userId}:`, error);
+    }
   }
 }
 
@@ -65,15 +87,29 @@ export async function notifyContributionReminder(
   amount: string,
   hoursLeft: number
 ): Promise<void> {
-  if (!(await canSendSms(userId))) return;
+  const userDetails = await getUserDetails(userId);
+  if (!userDetails) return;
 
-  const phone = await getUserPhone(userId);
-  if (!phone) return;
+  let sent = false;
 
-  try {
-    await sendContributionReminderSms(phone, circleName, amount, hoursLeft);
-  } catch (error) {
-    console.error(`Failed to send contribution reminder to ${userId}:`, error);
+  // Try SMS first
+  if (userDetails.smsNotificationsEnabled && userDetails.phone) {
+    try {
+      await sendContributionReminderSms(userDetails.phone, circleName, amount, hoursLeft);
+      sent = true;
+    } catch (error) {
+      console.error(`Failed to send contribution reminder SMS to ${userId}:`, error);
+    }
+  }
+
+  // Try email if enabled, has email
+  if (userDetails.emailNotificationsEnabled && userDetails.email) {
+    try {
+      const dueDate = new Date(Date.now() + hoursLeft * 60 * 60 * 1000);
+      await sendContributionReminderEmail(userDetails.email, userDetails.displayName, circleName, amount, "USDC", dueDate, userId);
+    } catch (error) {
+      console.error(`Failed to send contribution reminder email to ${userId}:`, error);
+    }
   }
 }
 
@@ -87,15 +123,28 @@ export async function notifyPayoutProcessed(
   recipientName: string
 ): Promise<void> {
   const notifications = memberUserIds.map(async (userId) => {
-    if (!(await canSendSms(userId))) return;
-    
-    const phone = await getUserPhone(userId);
-    if (!phone) return;
+    const userDetails = await getUserDetails(userId);
+    if (!userDetails) return;
 
-    try {
-      await sendPayoutProcessedSms(phone, circleName, amount, recipientName);
-    } catch (error) {
-      console.error(`Failed to send payout notification to ${userId}:`, error);
+    let sent = false;
+
+    // Try SMS first
+    if (userDetails.smsNotificationsEnabled && userDetails.phone) {
+      try {
+        await sendPayoutProcessedSms(userDetails.phone, circleName, amount, recipientName);
+        sent = true;
+      } catch (error) {
+        console.error(`Failed to send payout processed SMS to ${userId}:`, error);
+      }
+    }
+
+    // Try email if enabled, has email
+    if (userDetails.emailNotificationsEnabled && userDetails.email) {
+      try {
+        await sendPayoutProcessedEmail(userDetails.email, userDetails.displayName, circleName, amount, recipientName, userId);
+      } catch (error) {
+        console.error(`Failed to send payout processed email to ${userId}:`, error);
+      }
     }
   });
 
@@ -110,15 +159,28 @@ export async function notifyMissedContribution(
   circleName: string,
   amount: string
 ): Promise<void> {
-  if (!(await canSendSms(userId))) return;
-  
-  const phone = await getUserPhone(userId);
-  if (!phone) return;
+  const userDetails = await getUserDetails(userId);
+  if (!userDetails) return;
 
-  try {
-    await sendMissedContributionSms(phone, circleName, amount);
-  } catch (error) {
-    console.error(`Failed to send missed contribution notification to ${userId}:`, error);
+  let sent = false;
+
+  // Try SMS first
+  if (userDetails.smsNotificationsEnabled && userDetails.phone) {
+    try {
+      await sendMissedContributionSms(userDetails.phone, circleName, amount);
+      sent = true;
+    } catch (error) {
+      console.error(`Failed to send missed contribution SMS to ${userId}:`, error);
+    }
+  }
+
+  // Try email if enabled, has email
+  if (userDetails.emailNotificationsEnabled && userDetails.email) {
+    try {
+      await sendMissedContributionEmail(userDetails.email, userDetails.displayName, circleName, amount, userId);
+    } catch (error) {
+      console.error(`Failed to send missed contribution email to ${userId}:`, error);
+    }
   }
 }
 
@@ -131,15 +193,28 @@ export async function notifyContributionReceived(
   amount: string,
   cycleNumber: number
 ): Promise<void> {
-  if (!(await canSendSms(userId))) return;
-  
-  const phone = await getUserPhone(userId);
-  if (!phone) return;
+  const userDetails = await getUserDetails(userId);
+  if (!userDetails) return;
 
-  try {
-    await sendContributionReceivedSms(phone, circleName, amount, cycleNumber);
-  } catch (error) {
-    console.error(`Failed to send contribution confirmation to ${userId}:`, error);
+  let sent = false;
+
+  // Try SMS first
+  if (userDetails.smsNotificationsEnabled && userDetails.phone) {
+    try {
+      await sendContributionReceivedSms(userDetails.phone, circleName, amount, cycleNumber);
+      sent = true;
+    } catch (error) {
+      console.error(`Failed to send contribution received SMS to ${userId}:`, error);
+    }
+  }
+
+  // Try email if enabled, has email
+  if (userDetails.emailNotificationsEnabled && userDetails.email) {
+    try {
+      await sendContributionReceivedEmail(userDetails.email, userDetails.displayName, circleName, amount, cycleNumber, userId);
+    } catch (error) {
+      console.error(`Failed to send contribution received email to ${userId}:`, error);
+    }
   }
 }
 
@@ -150,15 +225,28 @@ export async function notifyJoinRequestApproved(
   userId: string,
   circleName: string
 ): Promise<void> {
-  if (!(await canSendSms(userId))) return;
-  
-  const phone = await getUserPhone(userId);
-  if (!phone) return;
+  const userDetails = await getUserDetails(userId);
+  if (!userDetails) return;
 
-  try {
-    await sendJoinRequestApprovedSms(phone, circleName);
-  } catch (error) {
-    console.error(`Failed to send join approval notification to ${userId}:`, error);
+  let sent = false;
+
+  // Try SMS first
+  if (userDetails.smsNotificationsEnabled && userDetails.phone) {
+    try {
+      await sendJoinRequestApprovedSms(userDetails.phone, circleName);
+      sent = true;
+    } catch (error) {
+      console.error(`Failed to send join request approved SMS to ${userId}:`, error);
+    }
+  }
+
+  // Try email if enabled, has email
+  if (userDetails.emailNotificationsEnabled && userDetails.email) {
+    try {
+      await sendJoinRequestApprovedEmail(userDetails.email, userDetails.displayName, circleName, userId);
+    } catch (error) {
+      console.error(`Failed to send join request approved email to ${userId}:`, error);
+    }
   }
 }
 
@@ -169,15 +257,28 @@ export async function notifyJoinRequestRejected(
   userId: string,
   circleName: string
 ): Promise<void> {
-  if (!(await canSendSms(userId))) return;
-  
-  const phone = await getUserPhone(userId);
-  if (!phone) return;
+  const userDetails = await getUserDetails(userId);
+  if (!userDetails) return;
 
-  try {
-    await sendJoinRequestRejectedSms(phone, circleName);
-  } catch (error) {
-    console.error(`Failed to send join rejection notification to ${userId}:`, error);
+  let sent = false;
+
+  // Try SMS first
+  if (userDetails.smsNotificationsEnabled && userDetails.phone) {
+    try {
+      await sendJoinRequestRejectedSms(userDetails.phone, circleName);
+      sent = true;
+    } catch (error) {
+      console.error(`Failed to send join request rejected SMS to ${userId}:`, error);
+    }
+  }
+
+  // Try email if enabled, has email
+  if (userDetails.emailNotificationsEnabled && userDetails.email) {
+    try {
+      await sendJoinRequestRejectedEmail(userDetails.email, userDetails.displayName, circleName, userId);
+    } catch (error) {
+      console.error(`Failed to send join request rejected email to ${userId}:`, error);
+    }
   }
 }
 
@@ -195,6 +296,27 @@ export async function toggleSmsNotifications(
 }
 
 /**
+ * Notify circle creator (admin) that a member defaulted and a penalty was recorded.
+ */
+export async function notifyAdminOfDefault(
+  adminUserId: string,
+  defaulterUserId: string,
+  circleName: string,
+  penaltyAmount: string
+): Promise<void> {
+  if (!(await canSendSms(adminUserId))) return;
+  const phone = await getUserPhone(adminUserId);
+  if (!phone) return;
+
+  try {
+    const message = `Ajosave: A member defaulted in "${circleName}". Penalty of ${penaltyAmount} USDC recorded.`;
+    await sendSms(phone, message);
+  } catch (error) {
+    console.error(`Failed to notify admin ${adminUserId} about default:`, error);
+  }
+}
+
+/**
  * Notify all circle members when the circle completes (all payouts done)
  */
 export async function notifyCircleCompleted(
@@ -202,16 +324,28 @@ export async function notifyCircleCompleted(
   circleName: string
 ): Promise<void> {
   const notifications = memberUserIds.map(async (userId) => {
-    if (!(await canSendSms(userId))) return;
+    const userDetails = await getUserDetails(userId);
+    if (!userDetails) return;
 
-    const phone = await getUserPhone(userId);
-    if (!phone) return;
+    let sent = false;
 
-    try {
-      // Reuse the payout-processed SMS with a completion message
-      await sendPayoutProcessedSms(phone, circleName, "0", "everyone — the circle is complete!");
-    } catch (error) {
-      console.error(`Failed to send circle completion notification to ${userId}:`, error);
+    // Try SMS first
+    if (userDetails.smsNotificationsEnabled && userDetails.phone) {
+      try {
+        await sendPayoutProcessedSms(userDetails.phone, circleName, "0", "everyone — the circle is complete!");
+        sent = true;
+      } catch (error) {
+        console.error(`Failed to send circle completed SMS to ${userId}:`, error);
+      }
+    }
+
+    // Try email if enabled, has email
+    if (userDetails.emailNotificationsEnabled && userDetails.email) {
+      try {
+        await sendCircleCompletedEmail(userDetails.email, userDetails.displayName, circleName, userId);
+      } catch (error) {
+        console.error(`Failed to send circle completed email to ${userId}:`, error);
+      }
     }
   });
 
@@ -227,19 +361,32 @@ export async function notifyCircleCancelled(
   circleName: string,
   refundAmountUsdc: string | null
 ): Promise<void> {
-  if (!(await canSendSms(userId))) return;
+  const userDetails = await getUserDetails(userId);
+  if (!userDetails) return;
 
-  const phone = await getUserPhone(userId);
-  if (!phone) return;
+  let sent = false;
 
-  try {
-    if (refundAmountUsdc) {
-      await sendCircleCancelledSms(phone, circleName, refundAmountUsdc);
-    } else {
-      await sendCircleCancelledNoRefundSms(phone, circleName);
+  // Try SMS first
+  if (userDetails.smsNotificationsEnabled && userDetails.phone) {
+    try {
+      if (refundAmountUsdc) {
+        await sendCircleCancelledSms(userDetails.phone, circleName, refundAmountUsdc);
+      } else {
+        await sendCircleCancelledNoRefundSms(userDetails.phone, circleName);
+      }
+      sent = true;
+    } catch (error) {
+      console.error(`Failed to send circle cancelled SMS to ${userId}:`, error);
     }
-  } catch (error) {
-    console.error(`Failed to send circle cancellation notification to ${userId}:`, error);
+  }
+
+  // Try email if enabled, has email
+  if (userDetails.emailNotificationsEnabled && userDetails.email) {
+    try {
+      await sendCircleCancelledEmail(userDetails.email, userDetails.displayName, circleName, refundAmountUsdc, userId);
+    } catch (error) {
+      console.error(`Failed to send circle cancelled email to ${userId}:`, error);
+    }
   }
 }
 
@@ -251,15 +398,31 @@ export async function notifyCirclePaused(
   circleName: string
 ): Promise<void> {
   const notifications = memberUserIds.map(async (userId) => {
-    if (!(await canSendSms(userId))) return;
-    const phone = await getUserPhone(userId);
-    if (!phone) return;
-    try {
-      await sendCirclePausedSms(phone, circleName);
-    } catch (error) {
-      console.error(`Failed to send pause notification to ${userId}:`, error);
+    const userDetails = await getUserDetails(userId);
+    if (!userDetails) return;
+
+    let sent = false;
+
+    // Try SMS first
+    if (userDetails.smsNotificationsEnabled && userDetails.phone) {
+      try {
+        await sendCirclePausedSms(userDetails.phone, circleName);
+        sent = true;
+      } catch (error) {
+        console.error(`Failed to send circle paused SMS to ${userId}:`, error);
+      }
+    }
+
+    // Try email if enabled, has email
+    if (userDetails.emailNotificationsEnabled && userDetails.email) {
+      try {
+        await sendCirclePausedEmail(userDetails.email, userDetails.displayName, circleName, userId);
+      } catch (error) {
+        console.error(`Failed to send circle paused email to ${userId}:`, error);
+      }
     }
   });
+
   await Promise.allSettled(notifications);
 }
 
@@ -271,14 +434,30 @@ export async function notifyCircleResumed(
   circleName: string
 ): Promise<void> {
   const notifications = memberUserIds.map(async (userId) => {
-    if (!(await canSendSms(userId))) return;
-    const phone = await getUserPhone(userId);
-    if (!phone) return;
-    try {
-      await sendCircleResumedSms(phone, circleName);
-    } catch (error) {
-      console.error(`Failed to send resume notification to ${userId}:`, error);
+    const userDetails = await getUserDetails(userId);
+    if (!userDetails) return;
+
+    let sent = false;
+
+    // Try SMS first
+    if (userDetails.smsNotificationsEnabled && userDetails.phone) {
+      try {
+        await sendCircleResumedSms(userDetails.phone, circleName);
+        sent = true;
+      } catch (error) {
+        console.error(`Failed to send circle resumed SMS to ${userId}:`, error);
+      }
+    }
+
+    // Try email if enabled, has email
+    if (userDetails.emailNotificationsEnabled && userDetails.email) {
+      try {
+        await sendCircleResumedEmail(userDetails.email, userDetails.displayName, circleName, userId);
+      } catch (error) {
+        console.error(`Failed to send circle resumed email to ${userId}:`, error);
+      }
     }
   });
+
   await Promise.allSettled(notifications);
 }

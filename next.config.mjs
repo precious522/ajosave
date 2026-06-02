@@ -1,4 +1,9 @@
 import { withSentryConfig } from "@sentry/nextjs";
+import withBundleAnalyzer from "@next/bundle-analyzer";
+
+const bundleAnalyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
 
 /** @type {import('next').NextConfig} */
 
@@ -39,6 +44,23 @@ const nextConfig = {
     serverComponentsExternalPackages: ["@stellar/stellar-sdk"],
     instrumentationHook: true,
   },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+        ],
+      },
+      {
+        source: "/(.*)",
+        headers: securityHeaders,
+      },
+    ];
+  },
   async redirects() {
     return process.env.NODE_ENV === "production"
       ? [
@@ -51,14 +73,6 @@ const nextConfig = {
         ]
       : [];
   },
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: securityHeaders,
-      },
-    ];
-  },
   images: {
     formats: ["image/avif", "image/webp"],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
@@ -66,11 +80,11 @@ const nextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
+export default bundleAnalyzer(withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   silent: true,
   widenClientFileUpload: true,
   hideSourceMaps: true,
   disableLogger: true,
-});
+}));

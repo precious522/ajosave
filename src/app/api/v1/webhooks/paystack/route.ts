@@ -73,18 +73,46 @@ export async function POST(req: NextRequest) {
         [eventId, event.event, event]
       );
 
-      // Confirm the pending contribution matching this paystack_reference
-      const { rowCount } = await q(
-        `UPDATE contributions
-         SET status = 'confirmed', tx_hash = $1, updated_at = NOW()
-         WHERE paystack_reference = $1 AND status = 'pending'`,
+      // Fetch the contribution for this reference
+      const { rows: contribRows } = await q<{
+        id: string;
+        amount_usdc: string;
+        amount_paid_usdc: string;
+        is_partial: boolean;
+      }>(
+        `SELECT id, amount_usdc, amount_paid_usdc, is_partial
+         FROM contributions WHERE paystack_reference = $1 AND status = 'pending' LIMIT 1`,
         [reference]
       );
 
-      if (rowCount === 0) {
+      if (contribRows.length === 0) {
         logger.info({ reference }, "Paystack reference not found or already confirmed");
       } else {
-        logger.info({ reference }, "Contribution confirmed via Paystack webhook");
+        const contrib = contribRows[0];
+        // Amount paid in this transaction (from Paystack event, in kobo → convert to USDC proportionally)
+        // We use the metadata.payUsdc or topUpUsdc if present, otherwise treat as full payment
+        const meta = event.data?.metadata ?? {};
+        const creditUsdc = parseFloat(meta.payUsdc ?? meta.topUpUsdc ?? contrib.amount_usdc);
+        const newPaidUsdc = parseFloat(contrib.amount_paid_usdc) + creditUsdc;
+        const fullUsdc = parseFloat(contrib.amount_usdc);
+        const isFullyPaid = newPaidUsdc >= fullUsdc - 0.0000001; // float tolerance
+
+        await q(
+          `UPDATE contributions
+           SET amount_paid_usdc = $1,
+               status           = $2,
+               tx_hash          = $3,
+               updated_at       = NOW()
+           WHERE id = $4`,
+          [
+            Math.min(newPaidUsdc, fullUsdc).toFixed(7),
+            isFullyPaid ? "confirmed" : "pending",
+            reference,
+            contrib.id,
+          ]
+        );
+
+        logger.info({ reference, isFullyPaid, newPaidUsdc, fullUsdc }, "Contribution payment credited");
       }
     });
 

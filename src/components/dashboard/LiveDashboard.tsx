@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import type { Circle } from "@/types";
 import { CircleCard } from "@/components/circle/CircleCard";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
@@ -17,6 +17,7 @@ export function LiveDashboard({ initialCircles }: LiveDashboardProps) {
   const [circles, setCircles] = useState<Circle[]>(initialCircles);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [newCirclesCount, setNewCirclesCount] = useState(0);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const fetchCircles = useCallback(async () => {
     const res = await fetch("/api/circles?filter=mine");
@@ -40,6 +41,14 @@ export function LiveDashboard({ initialCircles }: LiveDashboardProps) {
       setLastUpdate(new Date());
     },
   });
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("ajosave:onboarding");
+      const parsed = stored ? JSON.parse(stored) : null;
+      if (!parsed?.seen) setShowOnboarding(true);
+    } catch {}
+  }, []);
 
   return (
     <>
@@ -75,6 +84,12 @@ export function LiveDashboard({ initialCircles }: LiveDashboardProps) {
             <CircleCard key={circle.id} circle={circle} members={[]} />
           ))}
         </div>
+      )}
+
+      {showOnboarding && (
+        // Lazy-load to keep bundle small
+        //@ts-ignore
+        <Onboarding onClose={() => setShowOnboarding(false)} />
       )}
     </>
   );

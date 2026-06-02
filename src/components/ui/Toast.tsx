@@ -85,6 +85,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 const ICONS: Record<ToastVariant, string> = {
   success: "✓",
   error: "✕",
+  warning: "⚠",
   info: "ℹ",
 };
 

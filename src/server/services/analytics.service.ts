@@ -214,6 +214,36 @@ export async function getDailyAnalytics(): Promise<DailyAnalyticsRow[]> {
   return rows;
 }
 
+export interface SmsDeliveryStats {
+  total: number;
+  delivered: number;
+  failed: number;
+  pending: number;
+  delivery_rate: number;
+}
+
+/**
+ * Fetch SMS delivery rate stats for the admin dashboard.
+ */
+export async function getSmsDeliveryStats(): Promise<SmsDeliveryStats> {
+  const { rows } = await query<{ status: string; count: string }>(
+    `SELECT status, COUNT(*)::text as count FROM sms_logs GROUP BY status`
+  );
+  const counts: Record<string, number> = {};
+  for (const row of rows) counts[row.status] = parseInt(row.count, 10);
+  const delivered = counts["delivered"] ?? 0;
+  const failed = counts["failed"] ?? 0;
+  const pending = counts["pending"] ?? 0;
+  const total = delivered + failed + pending;
+  return {
+    total,
+    delivered,
+    failed,
+    pending,
+    delivery_rate: total > 0 ? Math.round((delivered / total) * 10000) / 100 : 0,
+  };
+}
+
 /**
  * Fetch per-circle analytics for admins.
  */
