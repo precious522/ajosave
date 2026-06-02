@@ -3,7 +3,7 @@
 import type { AdminPayoutRow } from "@/server/services/admin.service";
 import { format } from "date-fns";
 import { CopyableText } from "@/components/ui/CopyableText";
-import styles from "../admin.module.css";
+import styles from "./admin.module.css";
 
 const explorerNetwork =
   process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "mainnet" : "testnet";

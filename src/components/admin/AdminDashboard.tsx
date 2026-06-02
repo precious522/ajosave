@@ -9,7 +9,11 @@ import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { DisputeList } from "./DisputeList";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { usePolling } from "@/hooks/usePolling";
-import styles from "../admin.module.css";
+import styles from "./admin.module.css";
+
+const CirclesTable = lazy(() => import("./CirclesTable").then((mod) => ({ default: mod.CirclesTable })));
+const PayoutsTable = lazy(() => import("./PayoutsTable").then((mod) => ({ default: mod.PayoutsTable })));
+const AnalyticsDashboard = lazy(() => import("./AnalyticsDashboard").then((mod) => ({ default: mod.AnalyticsDashboard })));
 
 type Tab = "circles" | "payouts" | "disputes" | "users" | "analytics";
 
@@ -200,7 +204,9 @@ export function AdminDashboard() {
       {error && <div className={styles.error} role="alert">{error}</div>}
 
       {tab === "analytics" ? (
-        <AnalyticsDashboard />
+        <Suspense fallback={<div className={styles.loading}>Loading analytics dashboard…</div>}>
+          <AnalyticsDashboard />
+        </Suspense>
       ) : loading ? (
         <div className={styles.loading}>Loading…</div>
       ) : tab === "circles" ? (

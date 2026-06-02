@@ -16,6 +16,39 @@ export interface EmailParams {
 }
 
 /**
+ * Helper to create unsubscribe link
+ */
+function getUnsubscribeLink(userId: string): string {
+  return `${serverConfig.app.url}/settings?unsubscribe=${userId}`;
+}
+
+/**
+ * Helper to create unsubscribe footer for HTML emails
+ */
+function getUnsubscribeFooterHtml(userId: string): string {
+  const link = getUnsubscribeLink(userId);
+  return `
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
+      <p>You're receiving this email because you're a member of Ajosave.</p>
+      <p><a href="${link}" style="color: #4F46E5;">Unsubscribe from email notifications</a></p>
+    </div>
+  `;
+}
+
+/**
+ * Helper to create unsubscribe footer for plain text emails
+ */
+function getUnsubscribeFooterText(userId: string): string {
+  const link = getUnsubscribeLink(userId);
+  return `
+
+---
+You're receiving this email because you're a member of Ajosave.
+Unsubscribe from email notifications: ${link}
+`;
+}
+
+/**
  * Send a generic email
  */
 export async function sendEmail(params: EmailParams): Promise<void> {
@@ -38,7 +71,8 @@ export async function sendEmail(params: EmailParams): Promise<void> {
  */
 export async function sendWelcomeEmail(
   email: string,
-  displayName: string
+  displayName: string,
+  userId: string
 ): Promise<void> {
   const html = `
     <!DOCTYPE html>
@@ -73,6 +107,7 @@ export async function sendWelcomeEmail(
             <p>Happy saving!</p>
             <p><strong>The Ajosave Team</strong></p>
           </div>
+          ${getUnsubscribeFooterHtml(userId)}
         </div>
       </body>
     </html>
@@ -95,6 +130,7 @@ export async function sendWelcomeEmail(
     
     Happy saving!
     The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
   `;
 
   await sendEmail({
@@ -114,7 +150,8 @@ export async function sendPayoutReceivedEmail(
   circleName: string,
   amount: string,
   currency: string,
-  txHash: string
+  txHash: string,
+  userId: string
 ): Promise<void> {
   const explorerUrl = `${serverConfig.stellar.horizonUrl.replace("api", "explorer")}/tx/${txHash}`;
 
@@ -147,6 +184,7 @@ export async function sendPayoutReceivedEmail(
             <p>Continue contributing to build your reputation and unlock more opportunities!</p>
             <p><strong>The Ajosave Team</strong></p>
           </div>
+          ${getUnsubscribeFooterHtml(userId)}
         </div>
       </body>
     </html>
@@ -169,11 +207,138 @@ export async function sendPayoutReceivedEmail(
     Continue contributing to build your reputation and unlock more opportunities!
     
     The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
   `;
 
   await sendEmail({
     to: email,
     subject: `Payout Received: ${amount} ${currency}`,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send OTP verification email
+ */
+export async function sendOtpEmail(
+  email: string,
+  displayName: string,
+  otp: string,
+  userId: string
+): Promise<void> {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #4F46E5; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; background: #f9fafb; }
+          .otp { font-size: 36px; font-weight: bold; text-align: center; margin: 20px 0; letter-spacing: 10px; color: #4F46E5; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Verify Your Email</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${displayName},</p>
+            <p>Your verification code is:</p>
+            <div class="otp">${otp}</div>
+            <p>This code is valid for 10 minutes. Please do not share this code with anyone.</p>
+            <p><strong>The Ajosave Team</strong></p>
+          </div>
+          ${getUnsubscribeFooterHtml(userId)}
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+    Verify Your Email
+    
+    Hi ${displayName},
+    
+    Your verification code is: ${otp}
+    
+    This code is valid for 10 minutes. Please do not share this code with anyone.
+    
+    The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: "Your Ajosave Verification Code",
+    html,
+    text,
+  });
+}
+
+/**
+ * Send payout reminder email
+ */
+export async function sendPayoutReminderEmail(
+  email: string,
+  displayName: string,
+  circleName: string,
+  amount: string,
+  hoursUntilPayout: number,
+  userId: string
+): Promise<void> {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #3B82F6; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; background: #f9fafb; }
+          .amount { font-size: 24px; font-weight: bold; color: #3B82F6; text-align: center; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🎁 Payout Coming Soon!</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${displayName},</p>
+            <p>Great news! Your payout from the <strong>${circleName}</strong> circle will be processed in ${hoursUntilPayout} hours!</p>
+            <div class="amount">${amount} USDC</div>
+            <p>Make sure your Stellar wallet is ready to receive the funds!</p>
+            <p><strong>The Ajosave Team</strong></p>
+          </div>
+          ${getUnsubscribeFooterHtml(userId)}
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+    Payout Coming Soon!
+    
+    Hi ${displayName},
+    
+    Great news! Your payout from the ${circleName} circle will be processed in ${hoursUntilPayout} hours!
+    
+    Amount: ${amount} USDC
+    
+    Make sure your Stellar wallet is ready to receive the funds!
+    
+    The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: `Payout Reminder: ${amount} USDC from ${circleName}`,
     html,
     text,
   });
@@ -188,7 +353,8 @@ export async function sendContributionReminderEmail(
   circleName: string,
   amount: string,
   currency: string,
-  dueDate: Date
+  dueDate: Date,
+  userId: string
 ): Promise<void> {
   const formattedDate = dueDate.toLocaleDateString("en-US", {
     weekday: "long",
@@ -226,6 +392,7 @@ export async function sendContributionReminderEmail(
             <p>Thank you for being a reliable member!</p>
             <p><strong>The Ajosave Team</strong></p>
           </div>
+          ${getUnsubscribeFooterHtml(userId)}
         </div>
       </body>
     </html>
@@ -248,6 +415,7 @@ export async function sendContributionReminderEmail(
     Thank you for being a reliable member!
     
     The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
   `;
 
   await sendEmail({
@@ -264,7 +432,8 @@ export async function sendContributionReminderEmail(
 export async function sendCircleCompletedEmail(
   email: string,
   displayName: string,
-  circleName: string
+  circleName: string,
+  userId: string
 ): Promise<void> {
   const html = `
     <!DOCTYPE html>
@@ -293,6 +462,7 @@ export async function sendCircleCompletedEmail(
             <p>Ready to start another savings journey?</p>
             <p><strong>The Ajosave Team</strong></p>
           </div>
+          ${getUnsubscribeFooterHtml(userId)}
         </div>
       </body>
     </html>
@@ -314,11 +484,533 @@ export async function sendCircleCompletedEmail(
     Ready to start another savings journey?
     
     The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
   `;
 
   await sendEmail({
     to: email,
     subject: `Circle Completed: ${circleName}`,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send payout processed email to circle members
+ */
+export async function sendPayoutProcessedEmail(
+  email: string,
+  displayName: string,
+  circleName: string,
+  amount: string,
+  recipientName: string,
+  userId: string
+): Promise<void> {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #10B981; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; background: #f9fafb; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>💸 Payout Processed</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${displayName},</p>
+            <p>A payout of <strong>${amount} USDC</strong> has been processed for <strong>${recipientName}</strong> in the <strong>${circleName}</strong> circle.</p>
+            <p>Check your circle dashboard for details.</p>
+            <p><strong>The Ajosave Team</strong></p>
+          </div>
+          ${getUnsubscribeFooterHtml(userId)}
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+    Payout Processed
+    
+    Hi ${displayName},
+    
+    A payout of ${amount} USDC has been processed for ${recipientName} in the ${circleName} circle.
+    
+    Check your circle dashboard for details.
+    
+    The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: `Payout Processed in ${circleName}`,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send missed contribution email
+ */
+export async function sendMissedContributionEmail(
+  email: string,
+  displayName: string,
+  circleName: string,
+  amount: string,
+  userId: string
+): Promise<void> {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #EF4444; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; background: #f9fafb; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>⚠️ Missed Contribution</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${displayName},</p>
+            <p>You missed your contribution of <strong>${amount} USDC</strong> to the <strong>${circleName}</strong> circle.</p>
+            <p>Your status is now "defaulted" and you cannot receive future payouts. Contact support if this is an error.</p>
+            <p><strong>The Ajosave Team</strong></p>
+          </div>
+          ${getUnsubscribeFooterHtml(userId)}
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+    Missed Contribution
+    
+    Hi ${displayName},
+    
+    You missed your contribution of ${amount} USDC to the ${circleName} circle.
+    
+    Your status is now "defaulted" and you cannot receive future payouts. Contact support if this is an error.
+    
+    The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: `Missed Contribution for ${circleName}`,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send contribution received confirmation email
+ */
+export async function sendContributionReceivedEmail(
+  email: string,
+  displayName: string,
+  circleName: string,
+  amount: string,
+  cycleNumber: number,
+  userId: string
+): Promise<void> {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #10B981; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; background: #f9fafb; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>✅ Contribution Confirmed</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${displayName},</p>
+            <p>Your contribution of <strong>${amount} USDC</strong> to <strong>${circleName}</strong> (Cycle ${cycleNumber}) has been confirmed.</p>
+            <p>Thank you!</p>
+            <p><strong>The Ajosave Team</strong></p>
+          </div>
+          ${getUnsubscribeFooterHtml(userId)}
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+    Contribution Confirmed
+    
+    Hi ${displayName},
+    
+    Your contribution of ${amount} USDC to ${circleName} (Cycle ${cycleNumber}) has been confirmed.
+    
+    Thank you!
+    
+    The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: `Contribution Confirmed for ${circleName}`,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send join request approved email
+ */
+export async function sendJoinRequestApprovedEmail(
+  email: string,
+  displayName: string,
+  circleName: string,
+  userId: string
+): Promise<void> {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #10B981; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; background: #f9fafb; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>✅ Join Request Approved</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${displayName},</p>
+            <p>Your join request for <strong>${circleName}</strong> has been approved!</p>
+            <p>You'll be notified when the circle starts.</p>
+            <p><strong>The Ajosave Team</strong></p>
+          </div>
+          ${getUnsubscribeFooterHtml(userId)}
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+    Join Request Approved
+    
+    Hi ${displayName},
+    
+    Your join request for ${circleName} has been approved!
+    
+    You'll be notified when the circle starts.
+    
+    The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: `Join Request Approved for ${circleName}`,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send join request rejected email
+ */
+export async function sendJoinRequestRejectedEmail(
+  email: string,
+  displayName: string,
+  circleName: string,
+  userId: string
+): Promise<void> {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #6B7280; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; background: #f9fafb; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>❌ Join Request Rejected</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${displayName},</p>
+            <p>Your join request for <strong>${circleName}</strong> has been declined by the creator.</p>
+            <p><strong>The Ajosave Team</strong></p>
+          </div>
+          ${getUnsubscribeFooterHtml(userId)}
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+    Join Request Rejected
+    
+    Hi ${displayName},
+    
+    Your join request for ${circleName} has been declined by the creator.
+    
+    The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: `Join Request Rejected for ${circleName}`,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send circle cancelled email
+ */
+export async function sendCircleCancelledEmail(
+  email: string,
+  displayName: string,
+  circleName: string,
+  refundAmountUsdc: string | null,
+  userId: string
+): Promise<void> {
+  let html, text;
+
+  if (refundAmountUsdc) {
+    html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #EF4444; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background: #f9fafb; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>❌ Circle Cancelled</h1>
+            </div>
+            <div class="content">
+              <p>Hi ${displayName},</p>
+              <p>The circle <strong>${circleName}</strong> has been cancelled by the creator.</p>
+              <p>A refund of <strong>${refundAmountUsdc} USDC</strong> has been sent to your Stellar wallet.</p>
+              <p><strong>The Ajosave Team</strong></p>
+            </div>
+            ${getUnsubscribeFooterHtml(userId)}
+          </div>
+        </body>
+      </html>
+    `;
+
+    text = `
+      Circle Cancelled
+      
+      Hi ${displayName},
+      
+      The circle ${circleName} has been cancelled by the creator.
+      
+      A refund of ${refundAmountUsdc} USDC has been sent to your Stellar wallet.
+      
+      The Ajosave Team
+      ${getUnsubscribeFooterText(userId)}
+    `;
+  } else {
+    html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #EF4444; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background: #f9fafb; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>❌ Circle Cancelled</h1>
+            </div>
+            <div class="content">
+              <p>Hi ${displayName},</p>
+              <p>The circle <strong>${circleName}</strong> has been cancelled by the creator.</p>
+              <p>You had no confirmed contributions, so no refund is needed.</p>
+              <p><strong>The Ajosave Team</strong></p>
+            </div>
+            ${getUnsubscribeFooterHtml(userId)}
+          </div>
+        </body>
+      </html>
+    `;
+
+    text = `
+      Circle Cancelled
+      
+      Hi ${displayName},
+      
+      The circle ${circleName} has been cancelled by the creator.
+      
+      You had no confirmed contributions, so no refund is needed.
+      
+      The Ajosave Team
+      ${getUnsubscribeFooterText(userId)}
+    `;
+  }
+
+  await sendEmail({
+    to: email,
+    subject: `Circle Cancelled: ${circleName}`,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send circle paused email
+ */
+export async function sendCirclePausedEmail(
+  email: string,
+  displayName: string,
+  circleName: string,
+  userId: string
+): Promise<void> {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #F59E0B; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; background: #f9fafb; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>⏸️ Circle Paused</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${displayName},</p>
+            <p>The circle <strong>${circleName}</strong> has been paused by the creator.</p>
+            <p>Future payouts are temporarily suspended. You'll be notified when it resumes.</p>
+            <p><strong>The Ajosave Team</strong></p>
+          </div>
+          ${getUnsubscribeFooterHtml(userId)}
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+    Circle Paused
+    
+    Hi ${displayName},
+    
+    The circle ${circleName} has been paused by the creator.
+    
+    Future payouts are temporarily suspended. You'll be notified when it resumes.
+    
+    The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: `Circle Paused: ${circleName}`,
+    html,
+    text,
+  });
+}
+
+/**
+ * Send circle resumed email
+ */
+export async function sendCircleResumedEmail(
+  email: string,
+  displayName: string,
+  circleName: string,
+  userId: string
+): Promise<void> {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #10B981; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; background: #f9fafb; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>▶️ Circle Resumed</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${displayName},</p>
+            <p>The circle <strong>${circleName}</strong> has been resumed.</p>
+            <p>Normal schedule and payouts have been restored.</p>
+            <p><strong>The Ajosave Team</strong></p>
+          </div>
+          ${getUnsubscribeFooterHtml(userId)}
+        </div>
+      </body>
+    </html>
+  `;
+
+  const text = `
+    Circle Resumed
+    
+    Hi ${displayName},
+    
+    The circle ${circleName} has been resumed.
+    
+    Normal schedule and payouts have been restored.
+    
+    The Ajosave Team
+    ${getUnsubscribeFooterText(userId)}
+  `;
+
+  await sendEmail({
+    to: email,
+    subject: `Circle Resumed: ${circleName}`,
     html,
     text,
   });

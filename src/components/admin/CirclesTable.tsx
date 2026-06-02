@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { CopyableText } from "@/components/ui/CopyableText";
 import { format } from "date-fns";
 import { getCurrencySymbol, SupportedCurrency } from "@/lib/currency";
-import styles from "../admin.module.css";
+import styles from "./admin.module.css";
 
 interface CirclesTableProps {
   circles: AdminCircleRow[];

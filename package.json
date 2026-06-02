@@ -41,7 +41,8 @@
     "migrate": "ts-node scripts/migrate.ts up",
     "migrate:down": "ts-node scripts/migrate.ts down",
     "migrate:create": "node-pg-migrate create --migrations-dir migrations",
-    "prepare": "husky"
+    "prepare": "husky",
+    "analyze": "ANALYZE=true npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -66,9 +67,12 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.52.1",
     "redis": "^5.12.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.6",
     "@playwright/test": "^1.44.1",
     "@testing-library/jest-dom": "^6.4.6",
     "@testing-library/react": "^16.0.0",
