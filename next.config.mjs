@@ -9,22 +9,24 @@ const bundleAnalyzer = withBundleAnalyzer({
 
 const cspHeader = [
   "default-src 'self'",
-  // Scripts: self + Next.js inline scripts (nonce not yet wired, so unsafe-inline in report-only)
-  "script-src 'self' 'unsafe-inline'",
+  // Scripts: self + trusted CDNs; unsafe-inline kept for Next.js inline scripts (report-only phase)
+  "script-src 'self' 'unsafe-inline' https://js.paystack.co https://cdn.vercel-insights.com",
   // Styles: self + inline (Next.js injects critical CSS)
   "style-src 'self' 'unsafe-inline'",
   // Images: self + data URIs
-  "img-src 'self' data:",
+  "img-src 'self' data: https:",
   // Fonts: self
   "font-src 'self'",
   // API / WebSocket connections restricted to known endpoints
-  "connect-src 'self' https://horizon.stellar.org https://horizon-testnet.stellar.org https://api.paystack.co https://api.ng.termii.com https://*.ingest.sentry.io",
+  "connect-src 'self' https://horizon.stellar.org https://horizon-testnet.stellar.org https://api.paystack.co https://api.ng.termii.com https://*.ingest.sentry.io https://vitals.vercel-insights.com",
   // No plugins
   "object-src 'none'",
   // Framing: deny
   "frame-ancestors 'none'",
   // Upgrade insecure requests in production
   "upgrade-insecure-requests",
+  // Report violations to /api/csp-report
+  "report-uri /api/csp-report",
 ].join("; ");
 
 const securityHeaders = [
@@ -33,6 +35,7 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
 ];
 
 const nextConfig = {
