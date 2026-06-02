@@ -10,6 +10,9 @@ import { encrypt, hmacIndex } from "./encryption";
 const ACCESS_TOKEN_TTL = 15 * 60; // 15 minutes in seconds
 const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 
+// Store pending session data temporarily (will be created in signIn event)
+const pendingSessionData = new Map<string, { sessionId: string; expiresAt: Date }>();
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt", maxAge: REFRESH_TOKEN_TTL },
   pages: { signIn: "/auth/login", error: "/auth/error" },
@@ -69,7 +72,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       const now = Math.floor(Date.now() / 1000);
 
       // Initial sign-in: generate refresh token and stamp both expiry times
@@ -111,7 +114,42 @@ export const authOptions: NextAuthOptions = {
       (session as { accessTokenExpires?: number }).accessTokenExpires =
         token.accessTokenExpires as number;
       (session as { error?: string }).error = token.error as string | undefined;
+      (session as { sessionId?: string }).sessionId = token.sessionId as string;
       return session;
+    },
+  },
+  events: {
+    async signIn({ user }) {
+      // Create session record in database when user signs in
+      // Note: We can't access the request object here, so we'll create a simplified session
+      // The full session with device info will be created on the first API request
+      const sessionData = pendingSessionData.get(user.id);
+      if (sessionData) {
+        try {
+          const tokenHash = hashToken(sessionData.sessionId);
+          // Create a basic session record (will be updated with device info on first request)
+          await query(
+            `INSERT INTO sessions (user_id, token_hash, device_name, device_type, browser, os, ip_address, user_agent, last_active_at, expires_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9)
+             ON CONFLICT (token_hash) DO UPDATE SET last_active_at = NOW()`,
+            [
+              user.id,
+              tokenHash,
+              "Web Browser",
+              "desktop",
+              "Unknown",
+              "Unknown",
+              "Unknown",
+              "Unknown",
+              sessionData.expiresAt,
+            ]
+          );
+        } catch (error) {
+          console.error("[auth] Failed to create session:", error);
+        } finally {
+          pendingSessionData.delete(user.id);
+        }
+      }
     },
   },
 };
