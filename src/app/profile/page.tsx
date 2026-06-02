@@ -12,7 +12,7 @@ export default function ProfilePage() {
   const router = useRouter();
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [form, setForm] = useState({ displayName: "" });
+  const [form, setForm] = useState({ displayName: "", email: "", stellarPublicKey: "", smsNotificationsEnabled: true, emailNotificationsEnabled: true });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [referral, setReferral] = useState<ReferralData | null>(null);
@@ -34,7 +34,13 @@ export default function ProfilePage() {
       .then((json) => {
         if (json.success) {
           setProfile(json.data);
-          setForm({ displayName: json.data.displayName ?? "" });
+          setForm({
+            displayName: json.data.displayName ?? "",
+            email: json.data.email ?? "",
+            stellarPublicKey: json.data.stellarPublicKey ?? "",
+            smsNotificationsEnabled: json.data.smsNotificationsEnabled,
+            emailNotificationsEnabled: json.data.emailNotificationsEnabled,
+          });
         }
       });
     fetch("/api/referral")
@@ -230,6 +236,33 @@ export default function ProfilePage() {
           )}
         </section>
 
+        {/* ── Notification preferences ── */}
+        <section className="card" style={{ marginBottom: "var(--space-6)" }}>
+          <h2 className={styles.sectionTitle}>Notification Preferences</h2>
+          <div className="input-group" style={{ marginBottom: "var(--space-3)" }}>
+            <label className="input-label">
+              <input
+                type="checkbox"
+                checked={form.smsNotificationsEnabled}
+                onChange={(e) => setForm((f) => ({ ...f, smsNotificationsEnabled: e.target.checked }))}
+                style={{ marginRight: "0.5rem" }}
+              />
+              SMS Notifications
+            </label>
+          </div>
+          <div className="input-group">
+            <label className="input-label">
+              <input
+                type="checkbox"
+                checked={form.emailNotificationsEnabled}
+                onChange={(e) => setForm((f) => ({ ...f, emailNotificationsEnabled: e.target.checked }))}
+                style={{ marginRight: "0.5rem" }}
+              />
+              Email Notifications
+            </label>
+          </div>
+        </section>
+
         {/* ── Editable fields ── */}
         <section className="card">
           <h2 className={styles.sectionTitle}>Edit Profile</h2>
@@ -260,13 +293,41 @@ export default function ProfilePage() {
               <input
                 id="stellarAddress"
                 className="input"
-                value={profile.stellarPublicKey ?? "Not set"}
-                disabled
-                aria-disabled="true"
-                aria-label="Stellar address (read-only)"
+                value={form.stellarPublicKey}
+                onChange={(e) => {
+                  setForm((f) => ({ ...f, stellarPublicKey: e.target.value }));
+                  setStellarKeyError(null);
+                }}
+                placeholder="GXXXXXX…"
                 spellCheck={false}
               />
-              {profile.stellarPublicKey && usdcBalance !== null && (
+              {connectionState !== "not_installed" && (
+                <ConnectWalletButton
+                  connectionState={connectionState}
+                  onConnect={connect}
+                  onDisconnect={disconnect}
+                  publicKey={publicKey}
+                />
+              )}
+              {connectionState === "not_installed" && (
+                <small className="input-hint">
+                  Don't have a Stellar wallet?{" "}
+                  <a href="https://freighter.app" target="_blank" rel="noopener noreferrer">
+                    Install Freighter
+                  </a>
+                </small>
+              )}
+              {stellarKeyError && (
+                <p role="alert" style={{ color: "var(--color-error)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
+                  {stellarKeyError}
+                </p>
+              )}
+              {walletError && (
+                <p role="alert" style={{ color: "var(--color-error)", fontSize: "0.875rem", marginTop: "0.25rem" }}>
+                  {walletError}
+                </p>
+              )}
+              {profile?.stellarPublicKey && usdcBalance !== null && (
                 <p style={{ color: "var(--color-success)", fontSize: "0.875rem", marginTop: "0.5rem" }}>
                   USDC balance: <strong>{parseFloat(usdcBalance).toFixed(2)} USDC</strong>
                 </p>

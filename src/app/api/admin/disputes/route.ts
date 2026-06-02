@@ -1,53 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { withErrorHandler } from "@/server/middleware";
-import { resolveDispute, confirmContributionFromDispute } from "@/server/services/dispute.service";
+import { withAdminAuth, withErrorHandler } from "@/server/middleware";
+import { resolveDispute, confirmContributionFromDispute, updateDisputeStatus, getAllDisputes } from "@/server/services/dispute.service";
 import type { ApiResponse, Dispute } from "@/types";
 import { z } from "zod";
 
 const ResolveDisputeSchema = z.object({
   disputeId: z.string().uuid(),
-  status: z.enum(["resolved", "rejected"]),
-  resolutionNotes: z.string().min(5).max(500),
+  status: z.enum(["investigating", "resolved", "rejected"]),
+  resolutionNotes: z.string().min(5).max(500).optional(),
   txHash: z.string().optional(),
   contributionId: z.string().uuid().optional(),
 });
 
-export const POST = withErrorHandler(async (req: NextRequest) => {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json<ApiResponse<never>>(
-      { success: false, error: "Unauthorized" },
-      { status: 401 }
-    );
-  }
+export const GET = withErrorHandler(
+  withAdminAuth(async () => {
+    const disputes = await getAllDisputes();
+    return NextResponse.json<ApiResponse<Dispute[]>>({ success: true, data: disputes });
+  })
+);
 
-  const user = session.user as { role?: string };
-  if (user.role !== "admin") {
-    return NextResponse.json<ApiResponse<never>>(
-      { success: false, error: "Admin access required" },
-      { status: 403 }
-    );
-  }
+export const POST = withErrorHandler(
+  withAdminAuth(async (req: NextRequest) => {
+    const session = await getServerSession(authOptions);
+    const body = await req.json();
+    const parsed = ResolveDisputeSchema.parse(body);
 
-  const body = await req.json();
-  const parsed = ResolveDisputeSchema.parse(body);
+    const dispute = parsed.status === "investigating"
+      ? await updateDisputeStatus(parsed.disputeId, "investigating")
+      : await resolveDispute(
+          parsed.disputeId,
+          parsed.status,
+          parsed.resolutionNotes ?? "",
+          (session?.user as { id: string }).id
+        );
 
-  const dispute = await resolveDispute(
-    parsed.disputeId,
-    parsed.status,
-    parsed.resolutionNotes,
-    session.user.id
-  );
+    if (parsed.status === "resolved" && parsed.txHash && parsed.contributionId) {
+      await confirmContributionFromDispute(parsed.disputeId, parsed.contributionId, parsed.txHash);
+    }
 
-  // If resolving as confirmed, update the contribution
-  if (parsed.status === "resolved" && parsed.txHash && parsed.contributionId) {
-    await confirmContributionFromDispute(parsed.disputeId, parsed.contributionId, parsed.txHash);
-  }
-
-  return NextResponse.json<ApiResponse<Dispute>>(
-    { success: true, data: dispute },
-    { status: 200 }
-  );
-});
+    return NextResponse.json<ApiResponse<Dispute>>({ success: true, data: dispute }, { status: 200 });
+  })
+);

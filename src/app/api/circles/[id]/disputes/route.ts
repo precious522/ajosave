@@ -8,9 +8,11 @@ import type { ApiResponse, Dispute } from "@/types";
 import { z } from "zod";
 
 const CreateDisputeSchema = z.object({
-  contributionId: z.string().uuid(),
+  contributionId: z.string().uuid().optional(),
   memberId: z.string().uuid(),
+  type: z.enum(["missed_payout", "wrong_amount", "other"]).default("other"),
   reason: z.string().min(10).max(500),
+  evidence: z.string().max(1000).optional(),
   paystackReference: z.string().optional(),
 });
 
@@ -48,6 +50,8 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
     parsed.memberId,
     params.id,
     parsed.reason,
+    parsed.type,
+    parsed.evidence,
     parsed.paystackReference
   );
 

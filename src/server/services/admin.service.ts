@@ -79,6 +79,52 @@ export async function adminSoftDeleteUser(userId: string): Promise<void> {
 }
 
 /**
+ * List all users for admin panel.
+ */
+export async function adminListUsers(search?: string): Promise<{ id: string; displayName: string; phone: string; email: string | null; role: string; reputationScore: number; createdAt: Date; deletedAt: Date | null }[]> {
+  const params: string[] = [];
+  let where = "WHERE deleted_at IS NULL";
+  if (search) {
+    params.push(`%${search}%`);
+    where += ` AND (display_name ILIKE $1 OR phone ILIKE $1 OR email ILIKE $1)`;
+  }
+  const { rows } = await query(
+    `SELECT id, display_name as "displayName", phone, email, role,
+            reputation_score as "reputationScore", created_at as "createdAt", deleted_at as "deletedAt"
+     FROM users ${where} ORDER BY created_at DESC LIMIT 200`,
+    params
+  );
+  return rows;
+}
+
+/**
+ * Get platform-wide stats.
+ */
+export async function adminGetPlatformStats(): Promise<{
+  totalCircles: number;
+  activeCircles: number;
+  totalUsers: number;
+  totalSavedUsdc: string;
+  openDisputes: number;
+}> {
+  const [circles, users, saved, disputes] = await Promise.all([
+    query<{ total: number; active: number }>(
+      `SELECT COUNT(*)::int as total, COUNT(*) FILTER (WHERE status='active')::int as active FROM circles WHERE deleted_at IS NULL`
+    ),
+    query<{ total: number }>(`SELECT COUNT(*)::int as total FROM users WHERE deleted_at IS NULL`),
+    query<{ total: string }>(`SELECT COALESCE(SUM(amount_usdc),0)::text as total FROM contributions WHERE status='confirmed'`),
+    query<{ total: number }>(`SELECT COUNT(*)::int as total FROM disputes WHERE status IN ('open','investigating')`),
+  ]);
+  return {
+    totalCircles: circles.rows[0].total,
+    activeCircles: circles.rows[0].active,
+    totalUsers: users.rows[0].total,
+    totalSavedUsdc: saved.rows[0].total,
+    openDisputes: disputes.rows[0].total,
+  };
+}
+
+/**
  * List all payouts across all circles, joined with circle name and recipient user id.
  */
 export async function adminListPayouts(): Promise<AdminPayoutRow[]> {
