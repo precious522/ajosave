@@ -157,8 +157,11 @@ export async function deployAjoContract(): Promise<string> {
   }
 
   const output = execSync(
-    `stellar contract deploy --wasm ${wasmPath} --source ${sourceKey} --rpc-url ${rpcUrl} ${networkFlag}`,
-    { encoding: "utf-8" }
+    `stellar contract deploy --wasm ${wasmPath} --source-account $STELLAR_SECRET_KEY --rpc-url ${rpcUrl} ${networkFlag}`,
+    {
+      encoding: "utf-8",
+      env: { ...process.env, STELLAR_SECRET_KEY: sourceKey },
+    }
   );
 
   const contractId = output.trim();
