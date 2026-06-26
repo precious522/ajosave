@@ -26,6 +26,7 @@ import {
   sendCircleResumedEmail,
   sendCircleCompletedEmail,
 } from "@/lib/email";
+import { sendContributionReminderPush } from "@/lib/push";
 
 interface UserDetails {
   phone: string | null;
@@ -78,38 +79,77 @@ export async function notifyPayoutReminder(
 }
 
 /**
- * Send a contribution reminder SMS to a member before the cycle deadline.
- * Checks that the user has SMS notifications enabled and a phone number on file.
- * Logs but does not throw if the SMS delivery fails.
+ * Get circle notification preferences for a user, defaulting to all enabled if not set
+ */
+async function getCircleNotificationPreferences(
+  userId: string,
+  circleId: string
+): Promise<{ pushEnabled: boolean; smsEnabled: boolean; emailEnabled: boolean }> {
+  const { rows } = await query<{ push_enabled: boolean; sms_enabled: boolean; email_enabled: boolean }>(
+    `SELECT push_enabled, sms_enabled, email_enabled 
+     FROM circle_notification_preferences 
+     WHERE user_id = $1 AND circle_id = $2`,
+    [userId, circleId]
+  );
+
+  if (rows.length > 0) {
+    return {
+      pushEnabled: rows[0].push_enabled,
+      smsEnabled: rows[0].sms_enabled,
+      emailEnabled: rows[0].email_enabled,
+    };
+  }
+
+  // Default to all enabled if no preferences set
+  return {
+    pushEnabled: true,
+    smsEnabled: true,
+    emailEnabled: true,
+  };
+}
+
+/**
+ * Send a contribution reminder SMS/email/push to a member before the cycle deadline.
+ * Checks that the user has notifications enabled and a contact method on file.
+ * Logs but does not throw if delivery fails.
  */
 export async function notifyContributionReminder(
   userId: string,
   circleName: string,
   amount: string,
-  hoursLeft: number
+  hoursLeft: number,
+  circleId: string
 ): Promise<void> {
   const userDetails = await getUserDetails(userId);
   if (!userDetails) return;
 
-  let sent = false;
+  const circlePrefs = await getCircleNotificationPreferences(userId, circleId);
 
   // Try SMS first
-  if (userDetails.smsNotificationsEnabled && userDetails.phone) {
+  if (circlePrefs.smsEnabled && userDetails.smsNotificationsEnabled && userDetails.phone) {
     try {
       await sendContributionReminderSms(userDetails.phone, circleName, amount, hoursLeft);
-      sent = true;
     } catch (error) {
       console.error(`Failed to send contribution reminder SMS to ${userId}:`, error);
     }
   }
 
-  // Try email if enabled, has email
-  if (userDetails.emailNotificationsEnabled && userDetails.email) {
+  // Try email
+  if (circlePrefs.emailEnabled && userDetails.emailNotificationsEnabled && userDetails.email) {
     try {
       const dueDate = new Date(Date.now() + hoursLeft * 60 * 60 * 1000);
       await sendContributionReminderEmail(userDetails.email, userDetails.displayName, circleName, amount, "USDC", dueDate, userId);
     } catch (error) {
       console.error(`Failed to send contribution reminder email to ${userId}:`, error);
+    }
+  }
+
+  // Try push notifications
+  if (circlePrefs.pushEnabled) {
+    try {
+      await sendContributionReminderPush(userId, circleName, amount, hoursLeft, circleId);
+    } catch (error) {
+      console.error(`Failed to send contribution reminder push to ${userId}:`, error);
     }
   }
 }
