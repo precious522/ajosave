@@ -11,3 +11,10 @@ coverage/
 contracts/target/
 *.tsbuildinfo
 next-env.d.ts
+
+# Playwright
+playwright-report/
+test-results/
+# Actual screenshots from visual regression runs (only baselines are committed)
+e2e/visual/__snapshots__/**/*-actual.png
+e2e/visual/__snapshots__/**/*-diff.png

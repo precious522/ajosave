@@ -1,0 +1,38 @@
+name: PostgreSQL Backup
+
+on:
+  schedule:
+    - cron: "0 2 * * *"   # 02:00 UTC daily
+  workflow_dispatch:        # allow manual trigger
+
+jobs:
+  backup:
+    name: Backup to S3
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_BACKUP_REGION }}   # separate region from app
+
+      - name: Install pg_dump
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Run backup
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          S3_BACKUP_BUCKET: ${{ secrets.S3_BACKUP_BUCKET }}
+          BACKUP_RETENTION_DAYS: 30
+        run: |
+          chmod +x scripts/pg_backup.sh
+          ./scripts/pg_backup.sh
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::PostgreSQL backup failed — check logs immediately"

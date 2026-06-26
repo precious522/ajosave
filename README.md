@@ -4,6 +4,7 @@
 > The traditional West African savings group — now with smart contracts, no middleman, automatic payouts.
 
 [![CI](https://github.com/JosephOnuh/ajosave/actions/workflows/ci.yml/badge.svg)](https://github.com/JosephOnuh/ajosave/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/JosephOnuh/ajosave/branch/main/graph/badge.svg)](https://codecov.io/gh/JosephOnuh/ajosave)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Built on Stellar](https://img.shields.io/badge/Built%20on-Stellar-blue)](https://stellar.org)
 [![Soroban](https://img.shields.io/badge/Smart%20Contracts-Soroban-blueviolet)](https://developers.stellar.org/docs/build/smart-contracts)
@@ -136,30 +137,22 @@ npm run contract:test    # Run Rust tests
 STELLAR_NETWORK=testnet npm run contract:deploy
 ```
 
-### Running in Production (Docker)
+#### Testnet Deployment
 
-The BullMQ worker must run as a separate process alongside the web app.
-Docker Compose manages both services:
+The Ajo contract is deployed on **Stellar Testnet**:
 
-```bash
-# Build and start web + worker + redis
-docker compose up --build -d
+| Field | Value |
+|-------|-------|
+| Network | Stellar Testnet |
+| Contract ID | `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` |
+| Explorer | [View on Stellar Expert](https://stellar.expert/explorer/testnet/contract/CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC) |
 
-# Tail worker logs
-docker compose logs -f worker
-
-# The worker restarts automatically on crash (restart: unless-stopped)
+Set in your environment:
+```
+STELLAR_AJO_CONTRACT_ID=CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
 ```
 
-To run only the worker (standalone):
-
-```bash
-docker build --target worker -t ajosave-worker .
-docker run --restart unless-stopped \
-  --env-file .env.local \
-  -e REDIS_URL=redis://your-redis-host:6379 \
-  ajosave-worker
-```
+> CI automatically re-deploys the contract to testnet on every merge to `main` via the `deploy-contract-testnet` job.
 
 ---
 
@@ -177,6 +170,8 @@ docker run --restart unless-stopped \
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR.
+
+See [CHANGELOG.md](CHANGELOG.md) for a full history of changes.
 
 - Bugs → [Bug Report](.github/ISSUE_TEMPLATE/bug_report.md)
 - Features → [Feature Request](.github/ISSUE_TEMPLATE/feature_request.md)

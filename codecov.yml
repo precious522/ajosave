@@ -1,0 +1,25 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 70%
+        threshold: 2%
+        if_not_found: success
+    patch:
+      default:
+        target: 70%
+        threshold: 5%
+        if_not_found: success
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: false
+
+ignore:
+  - "src/**/*.d.ts"
+  - "src/app/layout.tsx"
+  - "src/app/error.tsx"
+  - "src/app/**/error.tsx"
+  - "scripts/**"
+  - "migrations/**"

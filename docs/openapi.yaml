@@ -1,0 +1,587 @@
+openapi: 3.0.3
+info:
+  title: Ajosave API
+  description: |
+    Trustless rotating savings circles (Ajo/Esusu) on the Stellar blockchain.
+
+    ## API Versioning
+    This API uses URL-based versioning. All endpoints are prefixed with `/api/v1/`.
+    
+    **Current version:** v1  
+    **Base URL:** `/api/v1/`
+
+    Legacy endpoints without version prefix (`/api/`) are deprecated and redirect to v1.
+
+    ## Authentication
+    Most endpoints require a valid session cookie obtained via the OTP login flow:
+    1. `POST /api/v1/auth/send-otp` – request a 6-digit OTP to your phone
+    2. `POST /api/v1/auth/verify-otp` – exchange OTP for a session cookie (NextAuth)
+
+    The session cookie is automatically sent by the browser on subsequent requests.
+    Server-to-server callers must include the `Cookie` header.
+
+    The cron endpoint uses a separate `Authorization: Bearer <CRON_SECRET>` header.
+  version: "1.0.0"
+  contact:
+    email: security@ajosave.app
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://www.ajosave.app/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+tags:
+  - name: auth
+    description: OTP-based phone authentication
+  - name: circles
+    description: Savings circle lifecycle
+  - name: cron
+    description: Internal scheduler (server-to-server only)
+  - name: health
+    description: Service health check
+
+# ─── Security ──────────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+      description: NextAuth session cookie set after OTP verification
+    cronBearer:
+      type: http
+      scheme: bearer
+      description: Static secret from `CRON_SECRET` env var
+
+  schemas:
+    # ── Primitives ──────────────────────────────────────────────────────────────
+    ApiSuccess:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          description: Payload – see individual endpoint schemas
+
+    ApiError:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          type: string
+          example: "Circle not found"
+        code:
+          type: string
+          example: "UNAUTHORIZED"
+
+    # ── Domain objects ──────────────────────────────────────────────────────────
+    Circle:
+      type: object
+      required: [id, name, creatorId, contributionUsdc, contributionFiat, contributionCurrency, circleType, maxMembers, cycleFrequency, status, currentCycle, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Lagos Diaspora Circle"
+        creatorId:
+          type: string
+          format: uuid
+        contributionUsdc:
+          type: string
+          description: Per-member per-cycle amount in USDC (7 decimal places)
+          example: "10.0000000"
+        contributionFiat:
+          type: integer
+          description: Equivalent fiat amount collected via Paystack/Stripe
+          example: 16000
+        contributionCurrency:
+          type: string
+          enum: [NGN, GBP, USD, EUR]
+          example: NGN
+        circleType:
+          type: string
+          enum: [public, private]
+          example: public
+        maxMembers:
+          type: integer
+          minimum: 2
+          maximum: 20
+          example: 5
+        cycleFrequency:
+          type: string
+          enum: [weekly, biweekly, monthly]
+        status:
+          type: string
+          enum: [open, active, completed, cancelled]
+        contractId:
+          type: string
+          description: Deployed Soroban contract address (set when circle goes active)
+          example: "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+        currentCycle:
+          type: integer
+          description: 1-indexed current cycle number
+          example: 2
+        nextPayoutAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Member:
+      type: object
+      required: [id, circleId, userId, position, status, hasReceivedPayout, joinedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        circleId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        position:
+          type: integer
+          description: Payout order (1 = first to receive)
+          example: 3
+        status:
+          type: string
+          enum: [pending, active, defaulted, completed]
+        hasReceivedPayout:
+          type: boolean
+        joinedAt:
+          type: string
+          format: date-time
+
+    Payout:
+      type: object
+      required: [id, circleId, recipientMemberId, cycleNumber, amountUsdc, txHash, paidAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        circleId:
+          type: string
+          format: uuid
+        recipientMemberId:
+          type: string
+          format: uuid
+        cycleNumber:
+          type: integer
+          example: 1
+        amountUsdc:
+          type: string
+          example: "50.0000000"
+        txHash:
+          type: string
+          description: Stellar transaction hash
+          example: "abc123..."
+        paidAt:
+          type: string
+          format: date-time
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid session
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            success: false
+            error: "Unauthorized"
+            code: "UNAUTHORIZED"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            success: false
+            error: "Circle not found"
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            success: false
+            error: "Too many requests. Please wait before requesting another OTP."
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+          example:
+            success: false
+            error: "Internal server error"
+            code: "INTERNAL_ERROR"
+
+# ─── Paths ─────────────────────────────────────────────────────────────────────
+paths:
+  # ── Auth ────────────────────────────────────────────────────────────────────
+  /auth/send-otp:
+    post:
+      tags: [auth]
+      summary: Request a phone OTP
+      description: |
+        Sends a 6-digit OTP via SMS (Termii). Rate-limited to **3 requests per 10 minutes** per phone number.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+                  description: E.164 or local format (10–15 digits)
+                  example: "+2348012345678"
+      responses:
+        "200":
+          description: OTP sent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiSuccess"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: "OTP sent successfully"
+        "400":
+          description: Invalid phone number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Sign out
+      description: Clears the NextAuth session cookie.
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Signed out successfully
+
+  # ── Circles ─────────────────────────────────────────────────────────────────
+  /circles:
+    get:
+      tags: [circles]
+      summary: List circles
+      description: |
+        Returns open circles by default.
+        Pass `?filter=mine` (requires auth) to return only the authenticated user's circles.
+      parameters:
+        - in: query
+          name: filter
+          schema:
+            type: string
+            enum: [mine]
+          description: Set to `mine` to return the current user's circles
+      security:
+        - {}
+        - sessionCookie: []
+      responses:
+        "200":
+          description: List of circles
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiSuccess"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Circle"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      tags: [circles]
+      summary: Create a circle
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, contributionFiat, contributionCurrency, maxMembers, cycleFrequency]
+              properties:
+                name:
+                  type: string
+                  minLength: 3
+                  maxLength: 60
+                  example: "Lagos Diaspora Circle"
+                contributionFiat:
+                  type: integer
+                  minimum: 1000
+                  maximum: 5000000
+                  description: Per-member per-cycle amount in fiat
+                  example: 16000
+                contributionCurrency:
+                  type: string
+                  enum: [NGN, GBP, USD, EUR]
+                  description: Currency for the fiat amount
+                  example: NGN
+                maxMembers:
+                  type: integer
+                  minimum: 2
+                  maximum: 20
+                  example: 5
+                cycleFrequency:
+                  type: string
+                  enum: [weekly, biweekly, monthly]
+      responses:
+        "201":
+          description: Circle created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiSuccess"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Circle"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /circles/{id}:
+    get:
+      tags: [circles]
+      summary: Get circle details
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Circle with members
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiSuccess"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          circle:
+                            $ref: "#/components/schemas/Circle"
+                          members:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/Member"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /circles/{id}/join:
+    post:
+      tags: [circles]
+      summary: Join a circle
+      security:
+        - sessionCookie: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stellarPublicKey]
+              properties:
+                stellarPublicKey:
+                  type: string
+                  minLength: 56
+                  maxLength: 56
+                  description: Member's Stellar public key (G...)
+                  example: "GABC...XYZ"
+      responses:
+        "201":
+          description: Joined successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiSuccess"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Member"
+        "400":
+          description: Validation error or circle full
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /circles/{id}/contribute:
+    post:
+      tags: [circles]
+      summary: Initiate a contribution payment
+      description: |
+        Creates a Paystack payment session for the current cycle contribution.
+        Redirect the user to `authorizationUrl` to complete payment.
+        After payment, Paystack calls the verify webhook to confirm on-chain.
+      security:
+        - sessionCookie: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Paystack authorization URL
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiSuccess"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [authorizationUrl, reference]
+                        properties:
+                          authorizationUrl:
+                            type: string
+                            format: uri
+                            example: "https://checkout.paystack.com/abc123"
+                          reference:
+                            type: string
+                            example: "ajo-circle-uuid-1-a1b2c3d4"
+        "400":
+          description: Circle not active
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Not a member of this circle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Cron ────────────────────────────────────────────────────────────────────
+  /cron/cycle:
+    get:
+      tags: [cron]
+      summary: Trigger cycle payout check
+      description: |
+        Called by Vercel Cron (or any scheduler). Processes all circles whose
+        `next_payout_at` has passed and triggers on-chain payouts.
+
+        **Not intended for browser use.** Requires `Authorization: Bearer <CRON_SECRET>`.
+      security:
+        - cronBearer: []
+      responses:
+        "200":
+          description: Cycle check complete
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiSuccess"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: "Cycle check complete"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Health ──────────────────────────────────────────────────────────────────
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      description: Returns service status. Used by uptime monitors.
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  timestamp:
+                    type: string
+                    format: date-time
