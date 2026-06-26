@@ -136,6 +136,31 @@ npm run contract:test    # Run Rust tests
 STELLAR_NETWORK=testnet npm run contract:deploy
 ```
 
+### Running in Production (Docker)
+
+The BullMQ worker must run as a separate process alongside the web app.
+Docker Compose manages both services:
+
+```bash
+# Build and start web + worker + redis
+docker compose up --build -d
+
+# Tail worker logs
+docker compose logs -f worker
+
+# The worker restarts automatically on crash (restart: unless-stopped)
+```
+
+To run only the worker (standalone):
+
+```bash
+docker build --target worker -t ajosave-worker .
+docker run --restart unless-stopped \
+  --env-file .env.local \
+  -e REDIS_URL=redis://your-redis-host:6379 \
+  ajosave-worker
+```
+
 ---
 
 ## Benefits to the Stellar Ecosystem
