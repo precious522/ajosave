@@ -188,5 +188,29 @@ jobs:
           STELLAR_NETWORK: testnet
           STELLAR_SERVER_SECRET_KEY: ${{ secrets.STELLAR_TESTNET_SECRET_KEY }}
         run: npm run contract:deploy
-      - name: Print contract ID
-        run: cat .contract-id
+      - name: Read contract ID
+        run: echo "CONTRACT_ID=$(cat .contract-id)" >> $GITHUB_ENV
+      - name: Smoke test: get_state()
+        run: |
+          CONTRACT_ID=$(cat .contract-id)
+          RESULT=$(stellar contract invoke \
+            --id $CONTRACT_ID \
+            --source ${{ secrets.STELLAR_TESTNET_SECRET_KEY }} \
+            --rpc-url https://soroban-testnet.stellar.org \
+            --network-passphrase "Test SDF Network ; September 2015" \
+            -- get_state 2>&1)
+          echo "get_state result: $RESULT"
+          echo "## Contract Smoke Test" >> $GITHUB_STEP_SUMMARY
+          echo "- Contract ID: $CONTRACT_ID" >> $GITHUB_STEP_SUMMARY
+          echo "- get_state result: $RESULT" >> $GITHUB_STEP_SUMMARY
+          if echo "$RESULT" | grep -q 'error\|Error\|panic'; then
+            echo "Smoke test FAILED" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          echo "Smoke test PASSED" >> $GITHUB_STEP_SUMMARY
+      - name: Upload contract ID artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-id
+          path: .contract-id
+          retention-days: 30
