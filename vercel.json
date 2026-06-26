@@ -1,8 +1,46 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "main": true
+    }
+  },
+  "github": {
+    "enabled": true,
+    "autoAlias": true,
+    "silent": false
+  },
   "crons": [
     {
       "path": "/api/cron/cycle",
       "schedule": "0 * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "instrumentation.ts": {
+      "includeFiles": "migrations/**"
+    }
+  },
+  "env": {
+    "NEXT_PUBLIC_APP_NAME": "Ajosave",
+    "STELLAR_NETWORK": "mainnet",
+    "STELLAR_HORIZON_URL": "https://horizon.stellar.org",
+    "STELLAR_NETWORK_PASSPHRASE": "Public Global Stellar Network ; September 2015",
+    "USDC_ASSET_CODE": "USDC",
+    "USDC_ISSUER": "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+    "TERMII_SENDER_ID": "Ajosave"
+  },
+  "envPreview": {
+    "NEXT_PUBLIC_APP_NAME": "Ajosave Staging",
+    "STELLAR_NETWORK": "testnet",
+    "STELLAR_HORIZON_URL": "https://horizon-testnet.stellar.org",
+    "STELLAR_NETWORK_PASSPHRASE": "Test SDF Network ; September 2015",
+    "USDC_ASSET_CODE": "USDC",
+    "USDC_ISSUER": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+    "TERMII_SENDER_ID": "Ajosave"
+  },
+  "build": {
+    "env": {
+      "STELLAR_NETWORK": "mainnet"
+    }
+  }
 }

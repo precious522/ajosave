@@ -1,0 +1,45 @@
+name: Apply Branch Protection
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/branch-protection.yml"
+
+jobs:
+  protect:
+    name: Enforce main branch protection
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      administration: write
+    steps:
+      - name: Apply branch protection rules
+        env:
+          GH_TOKEN: ${{ secrets.BRANCH_PROTECTION_TOKEN }}
+        run: |
+          gh api \
+            --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/branches/main/protection \
+            --input - <<'EOF'
+          {
+            "required_status_checks": {
+              "strict": true,
+              "contexts": ["Lint & Type Check", "Unit Tests", "Next.js Build"]
+            },
+            "enforce_admins": false,
+            "required_pull_request_reviews": {
+              "required_approving_review_count": 1,
+              "dismiss_stale_reviews": true,
+              "require_code_owner_reviews": false
+            },
+            "restrictions": null,
+            "allow_force_pushes": false,
+            "allow_deletions": false,
+            "block_creations": false,
+            "required_conversation_resolution": true
+          }
+          EOF
+          echo "Branch protection applied to main."

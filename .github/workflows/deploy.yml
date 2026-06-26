@@ -33,6 +33,11 @@ jobs:
           TERMII_API_KEY: ${{ secrets.TERMII_API_KEY }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
         with:

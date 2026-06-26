@@ -1,0 +1,23 @@
+.page {
+  padding: var(--space-12) 0;
+  min-height: 100vh;
+  background-color: var(--color-bg-subtle);
+}
+
+.title {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--color-text-strong);
+  margin-bottom: var(--space-8);
+  text-align: center;
+}
+
+.errorCard {
+  background-color: rgba(239, 68, 68, 0.08);
+  border: 1px solid #ffa39e;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  color: var(--color-error);
+  text-align: center;
+  margin-bottom: var(--space-6);
+}

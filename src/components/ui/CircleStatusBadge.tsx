@@ -6,6 +6,7 @@ const labels: Record<CircleStatus, string> = {
   active: "Active",
   completed: "Completed",
   cancelled: "Cancelled",
+  paused: "Paused",
 };
 
 export function CircleStatusBadge({ status }: { status: CircleStatus }) {

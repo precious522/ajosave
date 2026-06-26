@@ -1,0 +1,52 @@
+name: Load Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL to test against"
+        required: false
+        default: "http://localhost:3000"
+  push:
+    branches: [main]
+    paths:
+      - "k6/**"
+
+jobs:
+  load-test:
+    name: k6 Payout Load Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Create results directory
+        run: mkdir -p k6-results
+
+      - name: Run payout load test
+        env:
+          BASE_URL: ${{ inputs.base_url || 'http://localhost:3000' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET || 'ci-placeholder' }}
+        run: |
+          k6 run k6/payout-load-test.js \
+            --env BASE_URL=$BASE_URL \
+            --env CRON_SECRET=$CRON_SECRET \
+            --out json=k6-results/raw.json \
+            || true  # don't fail CI on threshold breach — just record results
+
+      - name: Upload k6 results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k6-load-test-results
+          path: k6-results/
+          retention-days: 30

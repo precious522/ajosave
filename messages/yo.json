@@ -1,0 +1,54 @@
+{
+  "nav": {
+    "browseCircles": "Wo Àwọn Ìdìpọ̀",
+    "dashboard": "Pẹpẹ Iṣẹ",
+    "analytics": "Ìtúpalẹ̀",
+    "admin": "Alákòóso",
+    "profile": "Profaili",
+    "signIn": "Wọlé"
+  },
+  "home": {
+    "hero": "Ìfowópamọ́ Yíyípadà tí Kò Nílò Igbẹkẹle lórí Stellar",
+    "subtitle": "Darapọ̀ mọ́ tàbí ṣẹ̀dá àwọn ìdìpọ̀ ìfowópamọ́ (Ajo/Esusu) tí àwọn adéhùn ọlọ́gbọ́n ń ṣàkóso. Ṣe àfikún ní Naira, gba ní USDC.",
+    "getStarted": "Bẹ̀rẹ̀",
+    "browseCircles": "Wo Àwọn Ìdìpọ̀",
+    "poweredBy": "Agbára ní Stellar & USDC",
+    "heroTitle": "Àwọn ìdìpọ̀ Ajo, tí kò nílò igbẹkẹle & lórí ẹ̀kó",
+    "heroSubtitle": "Ẹ̀kó ìfowópamọ́ yíyípadà West African ìgbakejọ — báálẹ̀ tiẹ̀ní agbára nípa àwọn adéhùn ọlọ́gbọ́n Soroban. Kò sí aládálẹ̀. Kò sí eré. Àwọn ìṣẹ̀ dá ara wọn lápapọ̀ ní USDC.",
+    "startCircle": "Ṣẹ̀dá Ìdìpọ̀",
+    "whyAjosave": "Kílọ́ ni Ajosave?",
+    "howItWorks": "Báwo ni ó ṣiṣẹ́"
+  },
+  "circles": {
+    "title": "Wo Àwọn Ìdìpọ̀",
+    "create": "Ṣẹ̀dá Ìdìpọ̀",
+    "join": "Darapọ̀",
+    "members": "àwọn ọmọ ẹgbẹ́",
+    "perCycle": "fún ìyípadà kọ̀ọ̀kan",
+    "open": "Ṣíṣí",
+    "full": "Kún",
+    "active": "Ń ṣiṣẹ́",
+    "completed": "Parí"
+  },
+  "dashboard": {
+    "title": "Pẹpẹ Iṣẹ Mi",
+    "myCircles": "Àwọn Ìdìpọ̀ Mi",
+    "noCircles": "O kò tíì darapọ̀ mọ́ ìdìpọ̀ kankan."
+  },
+  "auth": {
+    "signIn": "Wọlé",
+    "signOut": "Jáde",
+    "phone": "Nọ́mbà Fóònù",
+    "sendOtp": "Firanṣẹ́ OTP",
+    "verifyOtp": "Jẹ́rìísí OTP",
+    "enterOtp": "Tẹ OTP"
+  },
+  "common": {
+    "loading": "Ń gbéru...",
+    "error": "Nǹkan kan ṣẹlẹ̀.",
+    "save": "Pamọ́",
+    "cancel": "Fagilé",
+    "confirm": "Jẹ́rìísí",
+    "back": "Padà"
+  }
+}
