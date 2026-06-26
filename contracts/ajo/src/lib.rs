@@ -308,6 +308,9 @@ impl AjoContract {
 
         let members: Vec<Address> = env.storage().instance().get(&DataKey::Members).expect("not initialized");
         let max_members: u32 = env.storage().instance().get(&DataKey::MaxMembers).expect("not initialized");
+        let token: Address = env.storage().instance().get(&DataKey::Token).expect("not initialized");
+        let contribution: i128 = env.storage().instance().get(&DataKey::ContributionAmount).expect("not initialized");
+        let interval: u64 = env.storage().instance().get(&DataKey::CycleIntervalSecs).expect("not initialized");
 
         for m in members.iter() {
             // Check contribution using temporary storage
@@ -359,7 +362,6 @@ impl AjoContract {
                 Self::update_reputation(&env, &member);
             }
         } else {
-            let interval: u64 = env.storage().instance().get(&DataKey::CycleIntervalSecs).expect("not initialized");
             env.storage().instance().set(&DataKey::CurrentCycle, &(current_cycle + 1));
             env.storage().instance().set(&DataKey::NextPayoutTime, &(env.ledger().timestamp() + interval));
         }
