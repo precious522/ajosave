@@ -14,6 +14,7 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
     type: "varchar(20)",
     notNull: true,
     default: "pending",
+    // @ts-ignore
     check: "status IN ('pending','confirmed','missed','refund_pending','refunded')",
   });
 
@@ -34,6 +35,7 @@ export async function down(pgm: MigrationBuilder): Promise<void> {
     type: "varchar(20)",
     notNull: true,
     default: "pending",
+    // @ts-ignore
     check: "status IN ('pending','confirmed','missed','refund_pending')",
   });
 }

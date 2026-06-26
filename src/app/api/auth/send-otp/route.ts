@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendOtp } from "@/lib/sms";
-import { withRateLimit, withErrorHandler } from "@/server/middleware";
+import { withRateLimit, withErrorHandler, withSanitizedBody } from "@/server/middleware";
 import { sendOtpSchema } from "@/types/schemas";
 import type { ApiResponse } from "@/types";
 import { getRedis } from "@/lib/redis";
@@ -56,7 +56,8 @@ interface SendOtpResponse {
  * }
  */
 export const POST = withRateLimit(
-  withErrorHandler(async (req: NextRequest) => {
+  withErrorHandler(
+    withSanitizedBody(async (req: NextRequest) => {
     const body = await req.json();
     const parsed = sendOtpSchema.safeParse(body);
     if (!parsed.success) {
@@ -96,6 +97,6 @@ export const POST = withRateLimit(
       success: true,
       data: { message: "OTP sent successfully" },
     });
-  }),
+  })),
   { limit: 5, windowMs: 10 * 60 * 1000 }
 );

@@ -27,7 +27,7 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { withErrorHandler } from "../index";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+
 const mockLogger = jest.requireMock("@/lib/logger").default as { child: jest.Mock };
 
 function makeReq(

@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { createCircleSchema, type CreateCircleInput } from "@/types/schemas";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./CreateCircleForm.module.css";
 import { TemplateSelector } from "./TemplateSelector";
@@ -15,6 +15,8 @@ const FORM_DEFAULTS: Partial<CreateCircleInput> = {
   cycleFrequency: "monthly",
   circleType: "public",
   contributionCurrency: "NGN",
+  yieldStrategy: "none",
+  penaltyPercent: 10,
 };
 
 function useUsdcPreview(amount: number | undefined, currency: string) {
@@ -83,6 +85,8 @@ export function CreateCircleForm() {
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
+      // Analytics: circle created (no PII)
+      try { (await import('@vercel/analytics')).track('circle_created', { circleId: json.data.id }); } catch {}
       router.push(`/circles/${json.data.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -156,6 +160,16 @@ export function CreateCircleForm() {
           Private circles require you to approve each join request
         </small>
         {errors.circleType && <p className={styles.fieldError}>{errors.circleType.message}</p>}
+      </div>
+
+      <div className="input-group">
+        <label className="input-label" htmlFor="payoutMethod">Payout Order</label>
+        <select id="payoutMethod" className="input" {...register("payoutMethod")}>
+          <option value="fixed">Fixed (first-come-first-served)</option>
+          <option value="randomized">Randomized (locked when circle fills)</option>
+        </select>
+        <small className="input-hint">Randomized order is locked and visible to all members once the circle is full.</small>
+        {errors.payoutMethod && <p className={styles.fieldError}>{errors.payoutMethod.message}</p>}
       </div>
 
       {error && <p className={styles.error} role="alert">{error}</p>}

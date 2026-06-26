@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- ABI bindings generation in CI: `stellar contract bindings typescript` runs on every merge to `main` and publishes generated TypeScript bindings as a CI artifact under `ajo-abi-bindings` (#507)
+- Placeholder TypeScript bindings committed to `contracts/ajo/bindings/index.ts` for local development without a full contract build
+
+### Changed
+
+- Bumped Ajo contract version to `0.2.0` in `contracts/ajo/Cargo.toml`
+
 ## [0.1.0] - 2026-04-24
 
 ### Added

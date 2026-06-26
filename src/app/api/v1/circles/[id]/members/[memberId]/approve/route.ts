@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { approveJoinRequest } from "@/server/services/circle.service";
-import { sendSms } from "@/lib/sms";
 import type { ApiResponse, Member } from "@/types";
 
 export async function POST(

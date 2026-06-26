@@ -7,6 +7,7 @@ import {
   getStreamStatus,
 } from "@/server/services/horizon-stream.service";
 import { withErrorHandler } from "@/server/middleware";
+import { horizonStreamSchema } from "@/types/schemas";
 import type { ApiResponse } from "@/types";
 
 /**
@@ -53,8 +54,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   // TODO: Add admin role check
 
-  const body = await req.json();
-  const { action } = body as { action: "start" | "stop" };
+  const parsed = horizonStreamSchema.safeParse(await req.json());
+  if (!parsed.success) {
+    return NextResponse.json<ApiResponse<never>>(
+      { success: false, error: parsed.error.errors[0].message },
+      { status: 400 }
+    );
+  }
+  const { action } = parsed.data;
 
   if (action === "start") {
     await startHorizonStream();
@@ -62,16 +69,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       success: true,
       data: { message: "Horizon stream started" },
     });
-  } else if (action === "stop") {
+  } else {
     stopHorizonStream();
     return NextResponse.json<ApiResponse<{ message: string }>>({
       success: true,
       data: { message: "Horizon stream stopped" },
     });
-  } else {
-    return NextResponse.json<ApiResponse<never>>(
-      { success: false, error: "Invalid action. Use 'start' or 'stop'" },
-      { status: 400 }
-    );
   }
 });

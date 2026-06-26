@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { query, transaction } from "@/lib/db";
-import { withErrorHandler } from "@/server/middleware";
+import { withErrorHandler, withSanitizedBody } from "@/server/middleware";
 import { randomBytes } from "crypto";
 import type { ApiResponse } from "@/types";
 
@@ -64,7 +64,7 @@ export const GET = withErrorHandler(async () => {
 });
 
 /** POST /api/referral — apply a referral code (one-time, before first contribution) */
-export const POST = withErrorHandler(async (req: NextRequest) => {
+export const POST = withErrorHandler(withSanitizedBody(async (req: NextRequest) => {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return NextResponse.json<ApiResponse<never>>(
@@ -119,4 +119,4 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   });
 
   return NextResponse.json<ApiResponse<{ applied: true }>>({ success: true, data: { applied: true } });
-});
+}));

@@ -2,8 +2,9 @@ name: PR Checks
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+
 jobs:
-  validate:
+  validate-title:
     name: Validate PR Title
     runs-on: ubuntu-latest
     steps:
@@ -22,3 +23,23 @@ jobs:
             chore
             ci
             revert
+
+  secrets-scan:
+    name: Scan for Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: true
+        with:
+          config: .gitleaks.toml
+          verbose: true
+          redact: true
+          fail: true

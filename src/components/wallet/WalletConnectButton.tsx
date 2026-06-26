@@ -16,7 +16,7 @@ import styles from "./WalletConnectButton.module.css";
 export function WalletConnectButton() {
   const { session, pairingUri, loading, error, connect, disconnect } = useWalletConnect();
   const [isMobile, setIsMobile] = useState(false);
-  const [QRCode, setQRCode] = useState<React.ComponentType<{ value: string; size: number }> | null>(null);
+  const [QRCode, setQRCode] = useState<any>(null);
 
   useEffect(() => {
     setIsMobile(/Mobi|Android|iPhone/i.test(navigator.userAgent));

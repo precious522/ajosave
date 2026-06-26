@@ -6,7 +6,7 @@ import { CircleTemplate } from "@/data/circleTemplates";
 interface TemplateSelectorProps {
   templates: CircleTemplate[];
   activeTemplateId: string | null;
-  onSelect: (template: CircleTemplate | null) => void;
+  onSelect: (_template: CircleTemplate | null) => void;
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = {

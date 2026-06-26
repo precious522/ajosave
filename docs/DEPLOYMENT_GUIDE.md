@@ -445,3 +445,47 @@ SELECT * FROM payouts WHERE circle_id = $1 ORDER BY cycle_number;
 | Production deployment | 10 min |
 | Post-deployment monitoring | Ongoing |
 | **Total** | **~50 minutes** |
+
+---
+
+## Testnet Faucet (Development Only)
+
+When `STELLAR_NETWORK=testnet`, a built-in faucet endpoint lets developers fund a Stellar account with testnet XLM and USDC in one step.
+
+### API
+
+```
+POST /api/stellar/faucet
+Content-Type: application/json
+Authorization: session cookie (must be logged in)
+
+{ "publicKey": "G..." }
+```
+
+**Response**
+```json
+{ "success": true, "data": { "xlmFunded": true, "usdcTxHash": "abc123..." } }
+```
+
+Blocked with `403` on mainnet.
+
+### UI Button
+
+The `FundTestnetButton` component (at `src/components/wallet/FundTestnetButton.tsx`) renders only when `NEXT_PUBLIC_STELLAR_NETWORK=testnet`. Add it to any wallet-connected page:
+
+```tsx
+import FundTestnetButton from "@/components/wallet/FundTestnetButton";
+
+<FundTestnetButton publicKey={stellarPublicKey} onSuccess={(txHash) => console.log(txHash)} />
+```
+
+### Rate Limiting
+
+The endpoint is rate-limited to **5 requests per 10 minutes** per IP to prevent abuse.
+
+### What it does
+
+1. Calls Friendbot (`https://friendbot.stellar.org?addr=<key>`) to create the account and fund it with 10,000 XLM.
+2. Sends **100 USDC** from the server wallet to the account.
+
+> **Requirement:** The server wallet (`STELLAR_SERVER_SECRET_KEY`) must hold a USDC trustline and sufficient balance. Fund it once via [Stellar Laboratory](https://laboratory.stellar.org) on testnet.

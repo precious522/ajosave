@@ -63,7 +63,7 @@ describe("CreateCircleForm", () => {
   });
 
   it("shows loading state during submission", async () => {
-    let resolveFetch: (value: any) => void;
+    let resolveFetch: (_value: any) => void;
     const fetchPromise = new Promise((resolve) => {
       resolveFetch = resolve;
     });

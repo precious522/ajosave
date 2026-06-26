@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import type { Circle } from "@/types";
 import { CircleCard } from "@/components/circle/CircleCard";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
@@ -8,6 +8,33 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { usePolling } from "@/hooks/usePolling";
 import Link from "next/link";
 import styles from "./LiveDashboard.module.css";
+
+function ExportCSVButton() {
+  const [loading, setLoading] = useState(false);
+
+  async function handleExport() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/user/contributions/export");
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `contributions-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button onClick={handleExport} disabled={loading} className="btn btn--secondary btn--sm">
+      {loading ? "Exporting…" : "Export CSV"}
+    </button>
+  );
+}
 
 interface LiveDashboardProps {
   initialCircles: Circle[];
@@ -17,6 +44,7 @@ export function LiveDashboard({ initialCircles }: LiveDashboardProps) {
   const [circles, setCircles] = useState<Circle[]>(initialCircles);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [newCirclesCount, setNewCirclesCount] = useState(0);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const fetchCircles = useCallback(async () => {
     const res = await fetch("/api/circles?filter=mine");
@@ -41,12 +69,21 @@ export function LiveDashboard({ initialCircles }: LiveDashboardProps) {
     },
   });
 
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("ajosave:onboarding");
+      const parsed = stored ? JSON.parse(stored) : null;
+      if (!parsed?.seen) setShowOnboarding(true);
+    } catch {}
+  }, []);
+
   return (
     <>
       <div className={styles.header}>
         <h1 className={styles.title}>My Circles</h1>
         <div className={styles.headerActions}>
           <ConnectionStatus isConnected={isConnected} lastUpdate={lastUpdate || undefined} />
+          <ExportCSVButton />
           <Link href="/circles/create" className="btn btn--accent">
             + New Circle
           </Link>
@@ -75,6 +112,12 @@ export function LiveDashboard({ initialCircles }: LiveDashboardProps) {
             <CircleCard key={circle.id} circle={circle} members={[]} />
           ))}
         </div>
+      )}
+
+      {showOnboarding && (
+        // Lazy-load to keep bundle small
+        //@ts-ignore
+        <Onboarding onClose={() => setShowOnboarding(false)} />
       )}
     </>
   );

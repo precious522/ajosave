@@ -1,21 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { PayoutHistoryRow } from "@/app/api/circles/[id]/payouts/route";
+import type { PayoutHistoryRow } from "@/server/services/payout.service";
 import { format } from "date-fns";
 import styles from "./PayoutHistory.module.css";
 
-const STELLAR_EXPLORER = "https://stellar.expert/explorer/testnet/tx";
+const explorerNetwork =
+  process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
+const STELLAR_EXPLORER = `https://stellar.expert/explorer/${explorerNetwork}/tx`;
 
 interface Props {
   circleId: string;
+  initialPayouts?: PayoutHistoryRow[];
 }
 
-export function PayoutHistory({ circleId }: Props) {
-  const [payouts, setPayouts] = useState<PayoutHistoryRow[] | null>(null);
+export function PayoutHistory({ circleId, initialPayouts }: Props) {
+  const [payouts, setPayouts] = useState<PayoutHistoryRow[] | null>(initialPayouts ?? null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (initialPayouts) return;
     fetch(`/api/circles/${circleId}/payouts`)
       .then((r) => r.json())
       .then((json) => {
@@ -23,7 +27,7 @@ export function PayoutHistory({ circleId }: Props) {
         else setError(json.error);
       })
       .catch(() => setError("Failed to load payout history."));
-  }, [circleId]);
+  }, [circleId, initialPayouts]);
 
   if (error) return <p className={styles.error}>{error}</p>;
 

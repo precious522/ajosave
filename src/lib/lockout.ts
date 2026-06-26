@@ -1,4 +1,5 @@
 import { getRedis } from "./redis";
+import { notifyAccountLockout } from "@/server/services/notification.service";
 
 const MAX_FAILURES = 5;
 const FAILURE_WINDOW = 10 * 60; // 10 minutes in seconds
@@ -74,6 +75,7 @@ export async function recordFailure(phone: string): Promise<LockoutStatus> {
     await redis.del(attemptsKey);
     
     const lockoutExpiresAt = Math.floor(Date.now() / 1000) + LOCKOUT_DURATION;
+    notifyAccountLockout(phone, new Date(lockoutExpiresAt * 1000)).catch(() => {});
     return {
       isLocked: true,
       attempts: MAX_FAILURES,

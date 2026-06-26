@@ -1,53 +1,180 @@
-title = "Ajosave Gitleaks Config"
+# Gitleaks configuration for AjoSave
+# Detects secrets like API keys, tokens, and credentials in the codebase
 
-[extend]
-useDefault = true
+[build]
+# Verbose output for debugging
+verbose = false
+# Show redacted secrets in output
+redact = true
+
+[source]
+# Scan the entire repository
+include-paths = []
+exclude-paths = [
+  "node_modules/",
+  ".git/",
+  "dist/",
+  "build/",
+  ".next/",
+  "coverage/",
+  "playwright-report/",
+  ".vscode/",
+  ".idea/",
+  "*.lock",
+  "*.log",
+  ".env.example",
+  ".env.local",
+  ".env.*.local",
+]
+
+# Rules for detecting secrets
+[[rules]]
+id = "aws-access-key"
+description = "AWS Access Key"
+regex = '''(?i)aws_access_key_id\s*=\s*[A-Z0-9]{20}'''
+tags = ["aws", "key"]
+entropy = 3.5
+
+[[rules]]
+id = "aws-secret-key"
+description = "AWS Secret Access Key"
+regex = '''(?i)aws_secret_access_key\s*=\s*[A-Za-z0-9/+=]{40}'''
+tags = ["aws", "key"]
+entropy = 3.5
 
 [[rules]]
 id = "stellar-secret-key"
-description = "Stellar secret key (starts with S, 56 chars, base32)"
-regex = '''\bS[A-Z2-7]{55}\b'''
-tags = ["stellar", "secret-key"]
-
-  [rules.allowlist]
-  regexes = [
-    '''\bSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\b''',
-  ]
+description = "Stellar Secret Key"
+regex = '''(?i)stellar.*secret.*key\s*[:=]\s*S[A-Z2-7]{55}'''
+tags = ["stellar", "key"]
+entropy = 4.0
 
 [[rules]]
-id = "generic-api-key"
-description = "Generic API key assignment"
-regex = '''(?i)(api[_-]?key|apikey)\s*[:=]\s*['"]?([A-Za-z0-9_\-]{20,})['"]?'''
-tags = ["api-key"]
+id = "stellar-server-secret"
+description = "Stellar Server Secret Key"
+regex = '''(?i)STELLAR_SERVER_SECRET_KEY\s*[:=]\s*S[A-Z2-7]{55}'''
+tags = ["stellar", "key"]
+entropy = 4.0
 
-  [rules.allowlist]
-  regexes = [
-    '''placeholder''',
-    '''sk_test_placeholder''',
-    '''your[_-]?api[_-]?key''',
-  ]
+[[rules]]
+id = "api-key-generic"
+description = "Generic API Key"
+regex = '''(?i)(api[_-]?key|apikey)\s*[:=]\s*[A-Za-z0-9\-_]{20,}'''
+tags = ["api", "key"]
+entropy = 3.5
+
+[[rules]]
+id = "private-key-pem"
+description = "Private Key (PEM format)"
+regex = '''-----BEGIN (RSA|DSA|EC|OPENSSH|PGP) PRIVATE KEY-----'''
+tags = ["private-key"]
+entropy = 3.0
 
 [[rules]]
 id = "jwt-token"
-description = "JWT token"
-regex = '''eyJ[A-Za-z0-9_\-]+\.eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+'''
-tags = ["jwt"]
+description = "JWT Token"
+regex = '''eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+'''
+tags = ["jwt", "token"]
+entropy = 4.0
 
 [[rules]]
-id = "private-key-header"
-description = "PEM private key header"
-regex = '''-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'''
-tags = ["private-key"]
+id = "github-token"
+description = "GitHub Token"
+regex = '''(?i)github[_-]?token\s*[:=]\s*ghp_[A-Za-z0-9_]{36,255}'''
+tags = ["github", "token"]
+entropy = 3.5
 
-[allowlist]
-description = "Global allow-list for test/CI placeholders"
+[[rules]]
+id = "github-pat"
+description = "GitHub Personal Access Token"
+regex = '''(?i)github.*pat\s*[:=]\s*ghp_[A-Za-z0-9_]{36,255}'''
+tags = ["github", "token"]
+entropy = 3.5
+
+[[rules]]
+id = "slack-token"
+description = "Slack Token"
+regex = '''(?i)slack[_-]?token\s*[:=]\s*xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[A-Za-z0-9_-]{24,34}'''
+tags = ["slack", "token"]
+entropy = 3.5
+
+[[rules]]
+id = "stripe-key"
+description = "Stripe API Key"
+regex = '''(?i)stripe[_-]?(?:secret|api)[_-]?key\s*[:=]\s*sk_(?:live|test)_[A-Za-z0-9_]{20,}'''
+tags = ["stripe", "key"]
+entropy = 3.5
+
+[[rules]]
+id = "paystack-key"
+description = "Paystack Secret Key"
+regex = '''(?i)paystack[_-]?(?:secret|api)[_-]?key\s*[:=]\s*sk_(?:live|test)_[A-Za-z0-9]{20,}'''
+tags = ["paystack", "key"]
+entropy = 3.5
+
+[[rules]]
+id = "database-url"
+description = "Database Connection String with Credentials"
+regex = '''(?i)(postgres|mysql|mongodb)://[a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+@[a-zA-Z0-9._-]+'''
+tags = ["database", "credentials"]
+entropy = 3.0
+
+[[rules]]
+id = "redis-url"
+description = "Redis Connection String with Credentials"
+regex = '''(?i)redis://:[a-zA-Z0-9_-]+@[a-zA-Z0-9._-]+'''
+tags = ["redis", "credentials"]
+entropy = 3.0
+
+[[rules]]
+id = "nextauth-secret"
+description = "NextAuth Secret"
+regex = '''(?i)nextauth[_-]?secret\s*[:=]\s*[A-Za-z0-9_-]{32,}'''
+tags = ["nextauth", "secret"]
+entropy = 3.5
+
+[[rules]]
+id = "termii-api-key"
+description = "Termii API Key"
+regex = '''(?i)termii[_-]?(?:api[_-])?key\s*[:=]\s*[A-Za-z0-9_-]{20,}'''
+tags = ["termii", "key"]
+entropy = 3.5
+
+[[rules]]
+id = "sentry-dsn"
+description = "Sentry DSN with Auth Token"
+regex = '''https://[a-f0-9]+@[a-z0-9.-]+\.ingest\.sentry\.io/[0-9]+'''
+tags = ["sentry", "dsn"]
+entropy = 3.0
+
+# Allowlist for false positives
+[[allowlist]]
+description = "Placeholder values in CI config"
 regexes = [
-  '''ci-secret-placeholder''',
+  '''SXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX''',
   '''sk_test_placeholder''',
   '''placeholder''',
-  '''\bSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\b''',
+  '''ci-secret-placeholder''',
 ]
+
+[[allowlist]]
+description = "Example values in documentation"
 paths = [
-  '''.gitleaks.toml''',
-  '''CHANGELOG.md''',
+  '''(?i).*\.md$''',
+  '''(?i).*example.*''',
+]
+
+[[allowlist]]
+description = "Test files"
+paths = [
+  '''(?i).*\.test\.(ts|js)$''',
+  '''(?i).*\.spec\.(ts|js)$''',
+  '''(?i).*/__tests__/.*''',
+]
+
+[[allowlist]]
+description = "Environment example files"
+paths = [
+  '''\.env\.example$''',
+  '''\.env\.local$''',
 ]

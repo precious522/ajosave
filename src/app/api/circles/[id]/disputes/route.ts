@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { withErrorHandler } from "@/server/middleware";
+import { withErrorHandler, withSanitizedBody } from "@/server/middleware";
 import { getDisputesByCircle, createDispute } from "@/server/services/dispute.service";
 import { getCircleById } from "@/server/services/circle.service";
 import type { ApiResponse, Dispute } from "@/types";
 import { z } from "zod";
 
 const CreateDisputeSchema = z.object({
-  contributionId: z.string().uuid(),
+  contributionId: z.string().uuid().optional(),
   memberId: z.string().uuid(),
+  type: z.enum(["missed_payout", "wrong_amount", "other"]).default("other"),
   reason: z.string().min(10).max(500),
+  evidence: z.string().max(1000).optional(),
   paystackReference: z.string().optional(),
 });
 
@@ -30,7 +32,7 @@ export const GET = withErrorHandler(async (_req: NextRequest, ctx: unknown) => {
   });
 });
 
-export const POST = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
+export const POST = withErrorHandler(withSanitizedBody(async (req: NextRequest, ctx: unknown) => {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json<ApiResponse<never>>(
@@ -48,6 +50,8 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
     parsed.memberId,
     params.id,
     parsed.reason,
+    parsed.type,
+    parsed.evidence,
     parsed.paystackReference
   );
 
@@ -55,4 +59,4 @@ export const POST = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
     { success: true, data: dispute },
     { status: 201 }
   );
-});
+}));

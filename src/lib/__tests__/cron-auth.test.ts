@@ -1,80 +1,88 @@
-import { verifyCronSecret } from "@/lib/cron-auth";
+import { computeSignature, signRequest, verifySignature } from "@/lib/cron-auth";
 import { serverConfig } from "@/server/config";
-import { NextRequest } from "next/server";
 
-// Cast to allow mutation in tests
 const mutableConfig = serverConfig as { cronSecret: string };
+const VALID_SECRET = "test-cron-secret-abc123";
+const PATH = "/api/v1/cron/cycle";
+const METHOD = "GET";
+const BASE_URL = `http://localhost${PATH}`;
 
-function makeRequest(authHeader?: string): NextRequest {
-  const headers: Record<string, string> = {};
-  if (authHeader !== undefined) {
-    headers["authorization"] = authHeader;
-  }
-  return new NextRequest("http://localhost/api/cron/cycle", { headers });
+function makeReq(headers: Record<string, string | undefined> = {}, method = METHOD) {
+  return {
+    method,
+    url: BASE_URL,
+    headers: { get: (k: string) => headers[k] ?? null },
+  };
 }
 
-describe("verifyCronSecret", () => {
-  const VALID_SECRET = "test-cron-secret-abc123";
-  const originalSecret = serverConfig.cronSecret;
+function makeSignedReq(overrides: { timestamp?: string; signature?: string } = {}) {
+  const timestamp = overrides.timestamp ?? Date.now().toString();
+  const signature = overrides.signature ?? computeSignature(VALID_SECRET, timestamp, METHOD, PATH);
+  return makeReq({ "x-timestamp": timestamp, "x-signature": signature });
+}
 
-  beforeEach(() => {
-    mutableConfig.cronSecret = VALID_SECRET;
+beforeEach(() => { mutableConfig.cronSecret = VALID_SECRET; });
+
+describe("computeSignature", () => {
+  it("returns a 64-char hex string", () => {
+    expect(computeSignature(VALID_SECRET, "123", METHOD, PATH)).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  afterEach(() => {
-    mutableConfig.cronSecret = originalSecret;
+  it("produces different signatures for different timestamps", () => {
+    const a = computeSignature(VALID_SECRET, "111", METHOD, PATH);
+    const b = computeSignature(VALID_SECRET, "222", METHOD, PATH);
+    expect(a).not.toBe(b);
+  });
+});
+
+describe("verifySignature", () => {
+  it("returns null for a valid signed request", () => {
+    expect(verifySignature(makeSignedReq())).toBeNull();
   });
 
-  it("returns null (authenticated) when token matches secret", () => {
-    const req = makeRequest(`Bearer ${VALID_SECRET}`);
-    expect(verifyCronSecret(req)).toBeNull();
+  it("returns error when x-timestamp is missing", () => {
+    expect(verifySignature(makeReq({ "x-signature": "abc" }))).toBeTruthy();
   });
 
-  it("returns 401 when Authorization header is missing", async () => {
-    const req = makeRequest();
-    const res = verifyCronSecret(req);
-    expect(res).not.toBeNull();
-    expect(res!.status).toBe(401);
-    const body = await res!.json();
-    expect(body).toEqual({ success: false, error: "Unauthorized" });
+  it("returns error when x-signature is missing", () => {
+    expect(verifySignature(makeReq({ "x-timestamp": Date.now().toString() }))).toBeTruthy();
   });
 
-  it("returns 401 when token is wrong", async () => {
-    const req = makeRequest("Bearer wrong-secret");
-    const res = verifyCronSecret(req);
-    expect(res).not.toBeNull();
-    expect(res!.status).toBe(401);
-    const body = await res!.json();
-    expect(body).toEqual({ success: false, error: "Unauthorized" });
+  it("returns error when signature is wrong", () => {
+    expect(verifySignature(makeSignedReq({ signature: "a".repeat(64) }))).toBeTruthy();
   });
 
-  it("returns 401 when Authorization header has no Bearer prefix", async () => {
-    const req = makeRequest(VALID_SECRET); // missing "Bearer " prefix
-    const res = verifyCronSecret(req);
-    expect(res).not.toBeNull();
-    expect(res!.status).toBe(401);
+  it("returns error when timestamp is outside 5-minute window (replay attack)", () => {
+    const oldTs = (Date.now() - 6 * 60 * 1000).toString();
+    expect(verifySignature(makeSignedReq({ timestamp: oldTs }))).toBeTruthy();
   });
 
-  it("returns 401 when CRON_SECRET env var is not configured (empty string)", async () => {
-    mutableConfig.cronSecret = ""; // simulate missing env var
-    const req = makeRequest("Bearer "); // attacker sends empty token
-    const res = verifyCronSecret(req);
-    expect(res).not.toBeNull();
-    expect(res!.status).toBe(401);
-  });
-
-  it("returns 401 when CRON_SECRET is not configured even with a valid-looking token", async () => {
+  it("returns error when CRON_SECRET is not configured", () => {
     mutableConfig.cronSecret = "";
-    const req = makeRequest(`Bearer ${VALID_SECRET}`);
-    const res = verifyCronSecret(req);
-    expect(res).not.toBeNull();
-    expect(res!.status).toBe(401);
+    expect(verifySignature(makeSignedReq())).toBeTruthy();
   });
 
-  it("returns 401 when Authorization header is 'Bearer ' with empty token", async () => {
-    const req = makeRequest("Bearer ");
-    const res = verifyCronSecret(req);
-    expect(res).not.toBeNull();
-    expect(res!.status).toBe(401);
+  it("returns error when signed with wrong secret", () => {
+    const ts = Date.now().toString();
+    const sig = computeSignature("wrong-secret", ts, METHOD, PATH);
+    expect(verifySignature(makeReq({ "x-timestamp": ts, "x-signature": sig }))).toBeTruthy();
+  });
+});
+
+describe("signRequest", () => {
+  it("produces headers that pass verifySignature", () => {
+    const headers = signRequest(METHOD, PATH);
+    expect(verifySignature(makeReq(headers))).toBeNull();
+  });
+
+  it("includes x-timestamp and x-signature", () => {
+    const headers = signRequest(METHOD, PATH);
+    expect(headers["x-timestamp"]).toBeDefined();
+    expect(headers["x-signature"]).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("throws when CRON_SECRET is not configured", () => {
+    mutableConfig.cronSecret = "";
+    expect(() => signRequest(METHOD, PATH)).toThrow("CRON_SECRET is not configured");
   });
 });

@@ -1,0 +1,118 @@
+name: Load Tests
+
+on:
+  # Auto-trigger after staging deploy completes on main (#517)
+  workflow_run:
+    workflows: ["Deploy to Staging"]
+    types: [completed]
+    branches: [main]
+  # Keep manual trigger for ad-hoc testing
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL to test against"
+        required: false
+        default: "https://staging.ajosave.app"
+
+jobs:
+  load-test:
+    name: k6 Payout Load Test
+    runs-on: ubuntu-latest
+    # Only run on successful staging deploys (skip if staging failed)
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring \
+            --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 \
+            --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Set staging URL
+        id: url
+        run: |
+          BASE_URL="${{ inputs.base_url || vars.STAGING_URL || 'https://staging.ajosave.app' }}"
+          echo "base_url=${BASE_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Create results directory
+        run: mkdir -p k6-results
+
+      - name: Run payout load test
+        id: k6
+        env:
+          BASE_URL: ${{ steps.url.outputs.base_url }}
+          CRON_SECRET: ${{ secrets.STAGING_CRON_SECRET || secrets.CRON_SECRET || 'ci-placeholder' }}
+          CIRCLE_ID: ${{ vars.LOAD_TEST_CIRCLE_ID || 'test-circle-id' }}
+        run: |
+          k6 run k6/payout-load-test.js \
+            --env BASE_URL="$BASE_URL" \
+            --env CRON_SECRET="$CRON_SECRET" \
+            --env CIRCLE_ID="$CIRCLE_ID" \
+            --out json=k6-results/raw.json \
+            --summary-export k6-results/summary.json
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce p95 < 500ms threshold
+        run: |
+          P95=$(jq -r '.metrics["http_req_duration"]["values"]["p(95)"] // empty' k6-results/summary.json)
+          if [ -z "$P95" ]; then
+            echo "⚠️  Could not read p95 from summary — skipping threshold check"
+            exit 0
+          fi
+          echo "p95 response time: ${P95}ms"
+          # Fail CI if p95 exceeds 500ms
+          python3 -c "
+          import sys
+          p95 = float('$P95')
+          if p95 > 500:
+              print(f'❌ FAIL: p95 ({p95:.1f}ms) exceeds 500ms threshold')
+              sys.exit(1)
+          else:
+              print(f'✅ PASS: p95 ({p95:.1f}ms) within 500ms threshold')
+          "
+
+      - name: Publish k6 results as job summary
+        if: always()
+        run: |
+          if [ ! -f k6-results/summary.json ]; then
+            echo "No summary.json found — skipping summary" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          P95=$(jq -r '.metrics["http_req_duration"]["values"]["p(95)"] // "N/A"' k6-results/summary.json)
+          P99=$(jq -r '.metrics["http_req_duration"]["values"]["p(99)"] // "N/A"' k6-results/summary.json)
+          MED=$(jq -r '.metrics["http_req_duration"]["values"]["med"] // "N/A"' k6-results/summary.json)
+          REQS=$(jq -r '.metrics["http_reqs"]["values"]["count"] // "N/A"' k6-results/summary.json)
+          ERR=$(jq -r '(.metrics["payout_error_rate"]["values"]["rate"] // 0) * 100 | floor' k6-results/summary.json)
+          BASE="${{ steps.url.outputs.base_url }}"
+
+          cat >> "$GITHUB_STEP_SUMMARY" << EOF
+          ## 🚀 Payout Load Test Results
+
+          **Target:** \`${BASE}/api/cron/cycle\`
+          **Trigger:** ${{ github.event_name == 'workflow_run' && 'auto — after staging deploy' || 'manual' }}
+
+          | Metric | Value | Threshold |
+          |--------|-------|-----------|
+          | p95 latency | ${P95}ms | ≤ 500ms |
+          | p99 latency | ${P99}ms | — |
+          | Median latency | ${MED}ms | — |
+          | Total requests | ${REQS} | — |
+          | Error rate | ${ERR}% | < 10% |
+          EOF
+
+      - name: Upload k6 results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k6-load-test-results
+          path: k6-results/
+          retention-days: 30

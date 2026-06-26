@@ -74,12 +74,12 @@ mod integration {
             client.join(m);
         }
 
-        let (cycle, max, _, completed) = client.get_state();
+let (cycle, max, _, completed, _) = client.get_state();
         assert_eq!(cycle, 1, "circle should start at cycle 1 after all members join");
         assert_eq!(max, *max_members);
         assert!(!completed);
+        assert_eq!(client.get_members().len(), 5);
 
-        // 2. Run through every cycle
         let mut timestamp: u64 = 0;
         for cycle_num in 1..=*max_members {
             // Advance past payout time
@@ -100,19 +100,31 @@ mod integration {
             );
 
             if cycle_num < *max_members {
-                let (current, _, _, done) = client.get_state();
+                let (current, _, _, done, _) = client.get_state();
                 assert_eq!(current, cycle_num + 1);
                 assert!(!done);
 
-                // All members contribute for next cycle
+                // All members contribute for next cycle (verify temp storage)
                 for m in members.iter() {
+                    let has_temp_before = env.storage().temporary().has(&crate::DataKey::Contributions(m.clone(), cycle_num + 1));
+                    assert!(!has_temp_before, "contribution should not exist before contribute");
                     client.contribute(m, &100_000_000);
+                    let has_temp_after = env.storage().temporary().has(&crate::DataKey::Contributions(m.clone(), cycle_num + 1));
+                    assert!(has_temp_after, "contribution should be in temp storage after contribute");
                 }
             }
         }
 
-        let (_, _, _, completed) = client.get_state();
+        let (_, _, _, completed, _) = client.get_state();
         assert!(completed, "circle should be marked completed after all payouts");
+
+        // Verify temporary contributions are cleared after completion
+        for cycle_num in 1..=*max_members {
+            for m in members.iter() {
+                let has_temp = env.storage().temporary().has(&crate::DataKey::Contributions(m.clone(), cycle_num));
+                assert!(!has_temp, "temp contributions should be cleared after circle completes");
+            }
+        }
     }
 
     /// initialize: rejects duplicate initialization
@@ -293,11 +305,77 @@ mod integration {
         assert_eq!(f.client.get_members().len(), 3);
     }
 
+    /// Full lifecycle with 20 members (maximum): initialize → 20 joins → 20 cycles → complete
+    #[test]
+    fn test_full_lifecycle_20_members() {
+        let f = setup_fixture(20);
+        let Fixture { env, members, token, client, contribution, max_members, interval, .. } = &f;
+
+        // Record initial balances
+        let mut initial_balances = soroban_sdk::Vec::new(&env);
+        for m in members.iter() {
+            initial_balances.push_back(token.balance(&m));
+        }
+
+        // 1. All 20 members join
+        for m in members.iter() {
+            client.join(m);
+        }
+        assert_eq!(client.get_members().len(), 20);
+
+        let (cycle, max, _, completed) = client.get_state();
+        assert_eq!(cycle, 1);
+        assert_eq!(max, *max_members);
+        assert!(!completed);
+
+        // 2. Run all 20 payout cycles
+        let mut timestamp: u64 = 0;
+        for cycle_num in 1..=*max_members {
+            timestamp += interval + 1;
+            env.ledger().with_mut(|l| l.timestamp = timestamp);
+
+            let recipient = members.get(cycle_num - 1).unwrap();
+            let balance_before = token.balance(&recipient);
+
+            client.payout();
+
+            let expected_pot = contribution * (*max_members as i128);
+            assert_eq!(
+                token.balance(&recipient) - balance_before,
+                expected_pot,
+                "cycle {cycle_num}: recipient should receive full pot of {expected_pot}"
+            );
+
+            if cycle_num < *max_members {
+                let (current, _, _, done) = client.get_state();
+                assert_eq!(current, cycle_num + 1);
+                assert!(!done);
+                for m in members.iter() {
+                    client.contribute(m);
+                }
+            }
+        }
+
+        // 3. Circle is completed
+        let (_, _, _, completed) = client.get_state();
+        assert!(completed, "circle should be marked completed after all 20 payouts");
+
+        // 4. Every member breaks even and has updated reputation
+        for (i, m) in members.iter().enumerate() {
+            let final_balance = token.balance(&m);
+            let initial = initial_balances.get(i as u32).unwrap();
+            assert_eq!(final_balance, initial, "member {i} should break even");
+
+            let reputation = client.get_reputation(m.clone());
+            assert!(reputation > 0, "member {i} should have non-zero reputation after completing circle");
+        }
+    }
+
     /// get_state: returns zeroed state before initialization (via default)
     #[test]
     fn test_get_state_before_start() {
         let f = setup_fixture(3);
-        let (cycle, _, _, completed) = f.client.get_state();
+        let (cycle, _, _, completed, _) = f.client.get_state();
         assert_eq!(cycle, 0);
         assert!(!completed);
     }
@@ -317,7 +395,7 @@ mod integration {
         f.env.ledger().with_mut(|l| l.timestamp = f.interval * 2 + 2);
         f.client.payout(); // must succeed — lock was released
 
-        let (cycle, _, _, _) = f.client.get_state();
+        let (cycle, _, _, _, _) = f.client.get_state();
         assert_eq!(cycle, 3);
     }
 
@@ -403,12 +481,12 @@ mod integration {
         // Join one member to set some state
         f.client.join(&f.members.get(0).unwrap());
 
-        let (cycle_before, max_before, _, completed_before) = f.client.get_state();
+        let (cycle_before, max_before, _, completed_before, _) = f.client.get_state();
 
         let new_wasm_hash = BytesN::from_array(&f.env, &[3u8; 32]);
         f.client.upgrade(&new_wasm_hash);
 
-        let (cycle_after, max_after, _, completed_after) = f.client.get_state();
+        let (cycle_after, max_after, _, completed_after, _) = f.client.get_state();
         assert_eq!(cycle_before, cycle_after, "cycle should be unchanged after upgrade");
         assert_eq!(max_before, max_after, "max_members should be unchanged after upgrade");
         assert_eq!(completed_before, completed_after, "completed flag should be unchanged after upgrade");
@@ -425,7 +503,7 @@ mod integration {
             client.join(m);
         }
 
-        let (cycle, max, _, completed) = client.get_state();
+        let (cycle, max, _, completed, _) = client.get_state();
         assert_eq!(cycle, 1);
         assert_eq!(max, 5);
         assert!(!completed);
@@ -448,7 +526,7 @@ mod integration {
             );
 
             if cycle_num < *max_members {
-                let (current, _, _, done) = client.get_state();
+                let (current, _, _, done, _) = client.get_state();
                 assert_eq!(current, cycle_num + 1);
                 assert!(!done);
                 for m in members.iter() {
@@ -457,7 +535,7 @@ mod integration {
             }
         }
 
-        let (_, _, _, completed) = client.get_state();
+        let (_, _, _, completed, _) = client.get_state();
         assert!(completed, "5-member circle should complete after 5 payouts");
     }
 

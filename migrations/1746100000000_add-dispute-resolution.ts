@@ -5,7 +5,6 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
     id: { type: "uuid", primaryKey: true },
     contribution_id: {
       type: "uuid",
-      notNull: true,
       references: "contributions(id)",
       onDelete: "CASCADE",
     },
@@ -22,12 +21,19 @@ export async function up(pgm: MigrationBuilder): Promise<void> {
       onDelete: "CASCADE",
     },
     paystack_reference: { type: "varchar(255)" },
+    type: {
+      type: "varchar(30)",
+      notNull: true,
+      default: "other",
+      check: "type IN ('missed_payout','wrong_amount','other')",
+    },
     reason: { type: "text", notNull: true },
+    evidence: { type: "text" },
     status: {
       type: "varchar(20)",
       notNull: true,
       default: "open",
-      check: "status IN ('open','resolved','rejected')",
+      check: "status IN ('open','investigating','resolved','rejected')",
     },
     resolution_notes: { type: "text" },
     resolved_by: { type: "varchar(255)" },

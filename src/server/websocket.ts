@@ -3,10 +3,8 @@
  * Provides real-time notifications to frontend clients
  */
 
-import { Server as SocketIOServer } from "socket.io";
+import { Server as SocketIOServer, Socket } from "socket.io";
 import type { Server as HTTPServer } from "http";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 
 let io: SocketIOServer | null = null;
 
@@ -61,11 +59,11 @@ export function initializeWebSocket(httpServer: HTTPServer): SocketIOServer {
     },
   });
 
-  io.on("connection", (socket) => {
+  io.on("connection", (socket: Socket) => {
     console.log(`[websocket] Client connected: ${socket.id}`);
 
     // Handle authentication
-    socket.on("authenticate", async (token: string) => {
+    socket.on("authenticate", async (_token: string) => {
       try {
         // Verify session token
         // In production, implement proper JWT verification

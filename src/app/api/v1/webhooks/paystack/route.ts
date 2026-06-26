@@ -21,6 +21,19 @@ function verifySignature(payload: string, signature: string): boolean {
   return timingSafeEqual(expectedBuffer, signatureBuffer);
 }
 
+function usdcToStroops(usdc: string | number): bigint {
+  const str = typeof usdc === "number" ? usdc.toFixed(7) : usdc;
+  const parts = str.split(".");
+  const integerPart = parts[0] || "0";
+  let fractionPart = parts[1] || "";
+  if (fractionPart.length > 7) {
+    fractionPart = fractionPart.slice(0, 7);
+  } else {
+    fractionPart = fractionPart.padEnd(7, "0");
+  }
+  return BigInt(integerPart + fractionPart);
+}
+
 export async function POST(req: NextRequest) {
   const signature = req.headers.get("x-paystack-signature") ?? "";
   const rawBody = await req.text();
@@ -73,18 +86,57 @@ export async function POST(req: NextRequest) {
         [eventId, event.event, event]
       );
 
-      // Confirm the pending contribution matching this paystack_reference
-      const { rowCount } = await q(
-        `UPDATE contributions
-         SET status = 'confirmed', tx_hash = $1, updated_at = NOW()
-         WHERE paystack_reference = $1 AND status = 'pending'`,
+      // Fetch the contribution for this reference
+      const { rows: contribRows } = await q<{
+        id: string;
+        amount_usdc: string;
+        amount_paid_usdc: string;
+        is_partial: boolean;
+      }>(
+        `SELECT id, amount_usdc, amount_paid_usdc, is_partial
+         FROM contributions WHERE paystack_reference = $1 AND status = 'pending' LIMIT 1`,
         [reference]
       );
 
-      if (rowCount === 0) {
+      if (contribRows.length === 0) {
         logger.info({ reference }, "Paystack reference not found or already confirmed");
       } else {
-        logger.info({ reference }, "Contribution confirmed via Paystack webhook");
+        const contrib = contribRows[0];
+        // Amount paid in this transaction (from Paystack event, in kobo → convert to USDC proportionally)
+        // We use the metadata.payUsdc or topUpUsdc if present, otherwise treat as full payment
+        const meta = event.data?.metadata ?? {};
+        const creditStroops = usdcToStroops(meta.payUsdc ?? meta.topUpUsdc ?? contrib.amount_usdc);
+        const contribPaidStroops = usdcToStroops(contrib.amount_paid_usdc);
+        const fullStroops = usdcToStroops(contrib.amount_usdc);
+
+        const newPaidStroops = contribPaidStroops + creditStroops;
+        const finalPaidStroops = newPaidStroops < fullStroops ? newPaidStroops : fullStroops;
+        const isFullyPaid = finalPaidStroops === fullStroops;
+
+        await q(
+          `UPDATE contributions
+           SET amount_paid_usdc = $1,
+               status           = $2,
+               tx_hash          = $3,
+               updated_at       = NOW()
+           WHERE id = $4`,
+          [
+            (Number(finalPaidStroops) / 10_000_000).toFixed(7),
+            isFullyPaid ? "confirmed" : "pending",
+            reference,
+            contrib.id,
+          ]
+        );
+
+        logger.info(
+          {
+            reference,
+            isFullyPaid,
+            newPaidUsdc: (Number(newPaidStroops) / 10_000_000).toFixed(7),
+            fullUsdc: contrib.amount_usdc,
+          },
+          "Contribution payment credited"
+        );
       }
     });
 

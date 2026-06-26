@@ -24,6 +24,24 @@ const config = {
       statements: 70,
     },
   },
+  // Integration tests require the Node environment (no DOM needed for supertest)
+  testEnvironmentOptions: {},
+  projects: [
+    {
+      displayName: "unit",
+      testEnvironment: "jest-environment-jsdom",
+      testPathPattern: "src/(?!__tests__/integration)",
+      setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
+      moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
+    },
+    {
+      displayName: "integration",
+      testEnvironment: "node",
+      testPathPattern: "src/__tests__/integration/.*\\.test\\.ts$",
+      setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
+      moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
+    },
+  ],
 };
 
 module.exports = createJestConfig(config);

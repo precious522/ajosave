@@ -38,18 +38,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing event ID" }, { status: 400 });
   }
 
-  // Replay attack prevention: check if event already processed
+  // Replay attack prevention: check if the webhook was processed in the last 24 hours
   const { rows: existingEvent } = await query(
-    "SELECT id FROM processed_webhooks WHERE id = $1 AND provider = 'paystack'",
+    `SELECT id FROM processed_webhooks
+     WHERE id = $1
+       AND provider = 'paystack'
+       AND created_at >= NOW() - INTERVAL '24 HOURS'`,
     [eventId]
   );
 
   if (existingEvent.length > 0) {
-    logger.info({ eventId }, "Paystack webhook already processed");
+    logger.info({ eventId }, "Paystack webhook already processed within deduplication window");
     return NextResponse.json({ received: true, duplicate: true });
   }
 
   logger.info({ eventId, event: event.event }, "Paystack webhook verified");
+
+  if (event.event === "charge.failed") {
+    const reference: string = event.data?.reference;
+    if (!reference) {
+      return NextResponse.json({ error: "Missing reference" }, { status: 400 });
+    }
+    await query(
+      `UPDATE contributions SET status = 'failed'
+       WHERE paystack_reference = $1 AND status = 'pending'`,
+      [reference]
+    );
+    return NextResponse.json({ received: true });
+  }
 
   if (event.event !== "charge.success") {
     // Record non-charge.success events too to prevent replays
@@ -76,7 +92,7 @@ export async function POST(req: NextRequest) {
       // Confirm the pending contribution matching this paystack_reference
       const { rowCount } = await q(
         `UPDATE contributions
-         SET status = 'confirmed', tx_hash = $1, updated_at = NOW()
+         SET status = 'confirmed', updated_at = NOW()
          WHERE paystack_reference = $1 AND status = 'pending'`,
         [reference]
       );
@@ -90,6 +106,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (err) {
+    if ((err as { code?: string }).code === "23505") {
+      logger.info({ eventId }, "Duplicate Paystack webhook event detected during insert");
+      return NextResponse.json({ received: true, duplicate: true });
+    }
     logger.error({ err, eventId }, "Error processing Paystack webhook");
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

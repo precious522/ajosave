@@ -35,10 +35,10 @@ console.log(`RPC: ${rpcUrl}`);
 const result = execSync(
   `stellar contract deploy \
     --wasm ${wasmPath} \
-    --source ${sourceKey} \
+    --source-account $STELLAR_SECRET_KEY \
     --rpc-url ${rpcUrl} \
     --network-passphrase "${passphrase}"`,
-  { encoding: "utf-8" }
+  { encoding: "utf-8", env: { ...process.env, STELLAR_SECRET_KEY: sourceKey } }
 );
 
 const contractId = result.trim();

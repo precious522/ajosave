@@ -3,7 +3,11 @@
 import type { AdminPayoutRow } from "@/server/services/admin.service";
 import { format } from "date-fns";
 import { CopyableText } from "@/components/ui/CopyableText";
-import styles from "../admin.module.css";
+import styles from "./admin.module.css";
+
+const explorerNetwork =
+  process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
+const STELLAR_EXPLORER = `https://stellar.expert/explorer/${explorerNetwork}/tx`;
 
 interface PayoutsTableProps {
   payouts: AdminPayoutRow[];
@@ -42,7 +46,7 @@ export function PayoutsTable({ payouts }: PayoutsTableProps) {
               <td>{parseFloat(payout.amountUsdc).toFixed(2)}</td>
               <td>
                 <a
-                  href={`https://stellar.expert/explorer/testnet/tx/${payout.txHash}`}
+                  href={`${STELLAR_EXPLORER}/${payout.txHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.monospace}

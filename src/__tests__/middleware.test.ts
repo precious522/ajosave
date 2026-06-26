@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 /// <reference types="jest" />
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { middleware } from "../middleware";
 
 // Set environment variable for CORS testing

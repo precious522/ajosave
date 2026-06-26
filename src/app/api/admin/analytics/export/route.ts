@@ -3,7 +3,7 @@ import { adminGetPerCircleAnalytics } from "@/server/services/analytics.service"
 import { withAdminAuth, withErrorHandler } from "@/server/middleware";
 
 export const GET = withErrorHandler(
-  withAdminAuth(async (req: NextRequest) => {
+  withAdminAuth(async (_req: NextRequest) => {
     const data = await adminGetPerCircleAnalytics();
 
     const headers = [

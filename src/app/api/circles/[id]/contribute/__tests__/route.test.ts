@@ -106,7 +106,11 @@ describe("POST /api/circles/[id]/contribute", () => {
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as any);
     // Upsert insert
     mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 } as any);
-    mockInitPayment.mockResolvedValue({ authorizationUrl: authUrl, reference: `ajo-${CIRCLE_ID}-${MEMBER_ID}-${CYCLE}` });
+    mockInitPayment.mockResolvedValue({ 
+      authorizationUrl: authUrl, 
+      reference: `ajo-${CIRCLE_ID}-${MEMBER_ID}-${CYCLE}`,
+      platformFee: 0 
+    });
 
     const res = await POST(makeRequest(), { params: { id: CIRCLE_ID } });
     const json = await res.json();

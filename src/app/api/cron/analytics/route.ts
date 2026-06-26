@@ -9,7 +9,7 @@ import { verifyCronSecret } from "@/lib/cron-auth";
  * Authorization: Bearer <CRON_SECRET>
  */
 export async function GET(req: NextRequest) {
-  const unauth = verifyCronSecret(req);
+  const unauth = await verifyCronSecret(req);
   if (unauth) return unauth;
 
   try {

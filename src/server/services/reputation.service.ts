@@ -1,5 +1,4 @@
 import { query } from "@/lib/db";
-import type { User } from "@/types";
 
 // Score adjustments
 const SCORE_INCREMENT = 5; // Points added on-time contribution

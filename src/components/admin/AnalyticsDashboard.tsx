@@ -44,7 +44,7 @@ export function AnalyticsDashboard() {
 
   // Chart tooltip states
   const [hoveredSavedPoint, setHoveredSavedPoint] = useState<DailyAnalyticsRow | null>(null);
-  const [hoveredCirclesPoint, setHoveredCirclesPoint] = useState<DailyAnalyticsRow | null>(null);
+  const [_hoveredCirclesPoint, _setHoveredCirclesPoint] = useState<DailyAnalyticsRow | null>(null);
 
   useEffect(() => {
     async function fetchAnalytics() {
@@ -157,7 +157,7 @@ export function AnalyticsDashboard() {
   }, [data?.dailyAnalytics]);
 
   // Dynamic calculations for custom SVG active circles bar chart
-  const circlesChartBars = useMemo(() => {
+  const _circlesChartBars = useMemo(() => {
     if (!data?.dailyAnalytics || data.dailyAnalytics.length === 0) return [];
     const chartWidth = 500;
     const chartHeight = 180;

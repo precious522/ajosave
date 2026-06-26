@@ -3,8 +3,6 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState, useEffect } from "react";
 import styles from "./CircleFilters.module.css";
-import { Input } from "@/components/ui/Input";
-import { SupportedCurrency } from "@/lib/currency";
 
 export function CircleFilters() {
   const router = useRouter();

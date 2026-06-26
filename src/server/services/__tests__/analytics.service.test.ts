@@ -1,6 +1,6 @@
 import {
   aggregateDailyAnalytics,
-  backfillHistoricalDailyAnalytics,
+  _backfillHistoricalDailyAnalytics,
   getDailyAnalytics,
   adminGetPerCircleAnalytics
 } from "@/server/services/analytics.service";

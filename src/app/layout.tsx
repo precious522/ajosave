@@ -4,9 +4,9 @@ import "@/styles/globals.css";
 import "@/styles/components.css";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
-import { SessionProvider } from "next-auth/react";
-import { SentryUserContext } from "@/components/SentryUserContext";
-import { PWAProvider } from "@/components/PWAProvider";
+import { Providers } from "@/components/Providers";
+import { cookies } from "next/headers";
+import { locales, defaultLocale, type Locale } from "@/i18n";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -35,9 +35,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = cookies();
+  const rawLocale = cookieStore.get("locale")?.value ?? defaultLocale;
+  const locale: Locale = locales.includes(rawLocale as Locale) ? (rawLocale as Locale) : defaultLocale;
+  const messages = (await import(`../../messages/${locale}.json`)).default;
+
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang={locale} className={inter.variable}>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -46,14 +51,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
-        <SessionProvider>
+        <Providers locale={locale} messages={messages}>
           <a href="#main-content" className="skip-link">Skip to main content</a>
-          <SentryUserContext />
           <Navbar />
           <main id="main-content">{children}</main>
           <Footer />
-          <PWAProvider />
-        </SessionProvider>
+        </Providers>
       </body>
     </html>
   );

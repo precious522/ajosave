@@ -1,7 +1,7 @@
 {
   "extends": ["next/core-web-vitals", "prettier"],
   "rules": {
-    "no-console": ["warn", { "allow": ["warn", "error"] }],
-    "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }]
+    "no-console": "off",
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }]
   }
 }

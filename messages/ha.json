@@ -1,0 +1,54 @@
+{
+  "nav": {
+    "browseCircles": "Duba Da'irori",
+    "dashboard": "Waje",
+    "analytics": "Nazari",
+    "admin": "Magaji",
+    "profile": "Bayani",
+    "signIn": "Shiga"
+  },
+  "home": {
+    "hero": "Ajiya Iska A Jiya Kan Stellar",
+    "subtitle": "Shiga ko ƙirƙiri rukunan ajiya (Ajo/Esusu) da ƙwadawar jamarori ta sadarwa. Saka Naira, samu USDC.",
+    "getStarted": "Fara",
+    "browseCircles": "Duba Da'irori",
+    "poweredBy": "Mai Iko Stellar & USDC",
+    "heroTitle": "Da'irori Ajo, mara alkawari & kan sararin sadarwa",
+    "heroSubtitle": "Tsohuwar jarin Yammacin Afrika na rukunan ajiya - yanzu ta iko ƙwadawar jamarori ta Soroban. Babu mai tsaro. Babu kunya. Saka USDC ta atomatik.",
+    "startCircle": "Ƙirƙiri Da'ira",
+    "whyAjosave": "Me dalilin Ajosave?",
+    "howItWorks": "Yadda aka aiki"
+  },
+  "circles": {
+    "title": "Duba Da'irori",
+    "create": "Ƙirƙiri Da'ira",
+    "join": "Shiga",
+    "members": "mambobi",
+    "perCycle": "a kowane lokaci",
+    "open": "Buɗe",
+    "full": "Cika",
+    "active": "Aiki",
+    "completed": "Gama"
+  },
+  "dashboard": {
+    "title": "Wajenta",
+    "myCircles": "Da'irori Nawa",
+    "noCircles": "Ba ka shiga ɗaraja ba."
+  },
+  "auth": {
+    "signIn": "Shiga",
+    "signOut": "Fita",
+    "phone": "Nomba Tarho",
+    "sendOtp": "Aika OTP",
+    "verifyOtp": "Tabbatar OTP",
+    "enterOtp": "Shigar da OTP"
+  },
+  "common": {
+    "loading": "Yawan...",
+    "error": "Wani abu ya dace.",
+    "save": "Ajiye",
+    "cancel": "Soke",
+    "confirm": "Amsa",
+    "back": "Koma"
+  }
+}

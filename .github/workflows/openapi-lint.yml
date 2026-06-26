@@ -1,0 +1,24 @@
+name: OpenAPI Lint
+
+on:
+  push:
+    paths: [docs/openapi.yaml]
+  pull_request:
+    paths: [docs/openapi.yaml]
+
+jobs:
+  validate:
+    name: Validate OpenAPI Spec
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install --no-save @apidevtools/swagger-parser@10
+      - run: |
+          node -e "
+            const SwaggerParser = require('@apidevtools/swagger-parser');
+            SwaggerParser.validate('docs/openapi.yaml')
+              .then(() => console.log('OpenAPI spec is valid'))
+              .catch(err => { console.error(err.message); process.exit(1); });
+          "

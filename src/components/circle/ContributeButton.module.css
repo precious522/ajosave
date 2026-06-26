@@ -51,3 +51,10 @@
   gap: 0.75rem;
   justify-content: flex-end;
 }
+
+.disclaimer {
+  font-size: 0.75rem;
+  color: var(--color-muted, #94a3b8);
+  margin: 0 0 1.25rem;
+  line-height: 1.4;
+}

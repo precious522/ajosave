@@ -1,12 +1,25 @@
 import pino from "pino";
 import { getCorrelationId } from "./correlation";
 
-const base = pino(
-  { level: process.env.LOG_LEVEL ?? "info" },
-  process.env.NODE_ENV !== "production"
-    ? pino.transport({ target: "pino-pretty", options: { colorize: true } })
-    : undefined
-);
+function buildTransport() {
+  if (process.env.NODE_ENV !== "production") {
+    return pino.transport({ target: "pino-pretty", options: { colorize: true } });
+  }
+  if (process.env.DATADOG_API_KEY) {
+    try {
+      require.resolve("pino-datadog-transport");
+      return pino.transport({
+        target: "pino-datadog-transport",
+        options: { apiKey: process.env.DATADOG_API_KEY, ddsource: "nodejs", service: "ajosave" },
+      });
+    } catch {
+      // pino-datadog-transport not installed; fall back to stdout JSON
+    }
+  }
+  return undefined;
+}
+
+const base = pino({ level: process.env.LOG_LEVEL ?? "info" }, buildTransport());
 
 // Proxy that injects correlationId from AsyncLocalStorage on every log call
 const logger = new Proxy(base, {

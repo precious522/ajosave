@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, getPoolStats } from "@/lib/db";
 import { serverConfig } from "@/server/config";
+import { checkHorizonHealth } from "@/lib/stellar";
 
 async function checkDb(): Promise<boolean> {
   try {
@@ -25,7 +26,7 @@ async function checkRedis(): Promise<boolean> {
 }
 
 export async function GET() {
-  const [db, redis] = await Promise.all([checkDb(), checkRedis()]);
+  const [db, redis, horizon] = await Promise.all([checkDb(), checkRedis(), checkHorizonHealth()]);
 
   const healthy = db && redis;
   const poolStats = getPoolStats();
@@ -35,6 +36,7 @@ export async function GET() {
       status: healthy ? "ok" : "degraded",
       db: db ? "ok" : "error",
       redis: redis ? "ok" : "error",
+      horizon: horizon ? "ok" : "error",
       pool: poolStats
         ? {
             total: poolStats.totalCount,

@@ -60,6 +60,7 @@ function makeCircle(overrides: Partial<Circle> = {}): Circle {
     maxMembers: 3,
     cycleFrequency: "monthly",
     payoutMethod: "fixed",
+    gracePeriodHours: 24,
     status: "active",
     currentCycle: 1,
     createdAt: new Date(),

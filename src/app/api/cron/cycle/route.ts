@@ -4,7 +4,7 @@ import { verifyCronSecret } from "@/lib/cron-auth";
 import type { ApiResponse } from "@/types";
 
 export const GET = async (req: NextRequest) => {
-  const unauth = verifyCronSecret(req);
+  const unauth = await verifyCronSecret(req);
   if (unauth) return unauth;
 
   await processDueCycles();

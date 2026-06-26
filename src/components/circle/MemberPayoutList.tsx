@@ -15,7 +15,7 @@ interface Props {
 
 export function MemberPayoutList({ circle, initialMembers, isCreator, currentUserId }: Props) {
   const [members, setMembers] = useState<Member[]>(
-    [...initialMembers].sort((a, b) => a.position - b.position)
+    [...initialMembers].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
   );
   const [shuffling, setShuffling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,12 +41,23 @@ export function MemberPayoutList({ circle, initialMembers, isCreator, currentUse
         <h2 className={styles.title}>
           Payout Order <span className={styles.count}>({members.length})</span>
         </h2>
-        {isCreator && circle.status === "open" && (
+        {isCreator && circle.status === "open" && circle.payoutMethod !== "randomized" && (
           <Button variant="ghost" size="sm" onClick={handleShuffle} loading={shuffling}>
             🔀 Randomize
           </Button>
         )}
       </div>
+
+      {circle.payoutMethod === "randomized" && circle.randomizationSeed && (
+        <p style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: "0.5rem", wordBreak: "break-all" }}>
+          🔒 Order locked · Seed: <code>{circle.randomizationSeed}</code>
+        </p>
+      )}
+      {circle.payoutMethod === "randomized" && !circle.randomizationSeed && (
+        <p style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: "0.5rem" }}>
+          🎲 Order will be randomized and locked when the circle fills.
+        </p>
+      )}
 
       {error && <p className={styles.error}>{error}</p>}
 
