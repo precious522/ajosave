@@ -14,7 +14,10 @@ Thank you for your interest in Ajosave! This guide covers everything you need to
 - [Running Tests](#running-tests)
 - [Smart Contract Development](#smart-contract-development)
 - [Commit Convention](#commit-convention)
+- [Branching Strategy](#branching-strategy)
+- [Code Style](#code-style)
 - [Pull Request Process](#pull-request-process)
+- [PR Checklist](#pr-checklist)
 - [Reporting Issues](#reporting-issues)
 
 ---
@@ -239,6 +242,38 @@ test(middleware): add rate limit tests
 
 ---
 
+## Branching Strategy
+
+Branch names follow the pattern `<prefix>/<short-description>`, where the prefix signals intent:
+
+| Prefix | Purpose | Example |
+|--------|---------|---------|
+| `feature/` | New features | `feature/circle-invite-link` |
+| `fix/` | Bug fixes | `fix/payout-double-trigger` |
+| `docs/` | Documentation only | `docs/contributing-guide` |
+| `test/` | Adding or updating tests | `test/payout-service-coverage` |
+| `chore/` | Maintenance, deps, config | `chore/upgrade-nextjs-15` |
+| `hotfix/` | Urgent production fixes | `hotfix/contract-overflow` |
+
+Always branch from `develop` (or `main` for hotfixes):
+
+```bash
+git checkout develop && git pull
+git checkout -b feature/your-feature-name
+```
+
+---
+
+## Code Style
+
+- **TypeScript** — strict mode is enabled (`"strict": true` in `tsconfig.json`). All code must type-check with `npm run type-check`.
+- **Prettier** — auto-formats on save (`.prettierrc` at repo root). Run `npm run format` before committing.
+- **ESLint** — rules are defined in `.eslintrc.json`. Run `npm run lint` and fix any errors before opening a PR. Use `npm run lint:fix` for auto-fixable issues.
+- **CSS** — vanilla CSS only (see `src/styles/`). Do not introduce CSS-in-JS libraries (styled-components, Emotion, etc.).
+- **Commit messages** — follow the Conventional Commits format described above.
+
+---
+
 ## Pull Request Process
 
 1. **Branch from `develop`:**
@@ -263,6 +298,19 @@ test(middleware): add rate limit tests
 5. PRs require **one approval** to merge. Security-sensitive contract changes require **two approvals**.
 
 6. Reference the issue in your PR description: `Closes #<issue-number>`.
+
+---
+
+## PR Checklist
+
+Before marking your PR ready for review, confirm all of the following:
+
+- [ ] Tests added or updated for changed behaviour
+- [ ] `npm run type-check` passes with no errors
+- [ ] `npm run lint` passes with no errors
+- [ ] `npm test` passes with no failures
+- [ ] `.env.example` updated if a new environment variable was introduced
+- [ ] Issue number linked in the PR description (`Closes #<issue>`)
 
 ---
 
