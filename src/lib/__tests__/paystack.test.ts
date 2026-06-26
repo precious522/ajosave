@@ -3,7 +3,11 @@
  */
 
 jest.mock("axios", () => ({
-  create: jest.fn(() => ({ post: jest.fn(), get: jest.fn() })),
+  create: jest.fn(() => ({
+    post: jest.fn(),
+    get: jest.fn(),
+    interceptors: { request: { use: jest.fn() } },
+  })),
 }));
 jest.mock("@/server/config", () => ({
   serverConfig: { paystack: { secretKey: "sk_test_secret" } },

@@ -3,18 +3,19 @@
 import { useState } from "react";
 import type { Circle, Member } from "@/types";
 import { Button } from "@/components/ui/Button";
-import { CopyableText } from "@/components/ui/CopyableText";
+import { MemberAvatar } from "@/components/ui/MemberAvatar";
 import styles from "./MemberPayoutList.module.css";
 
 interface Props {
   circle: Circle;
   initialMembers: Member[];
   isCreator: boolean;
+  currentUserId?: string;
 }
 
-export function MemberPayoutList({ circle, initialMembers, isCreator }: Props) {
+export function MemberPayoutList({ circle, initialMembers, isCreator, currentUserId }: Props) {
   const [members, setMembers] = useState<Member[]>(
-    [...initialMembers].sort((a, b) => a.position - b.position)
+    [...initialMembers].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
   );
   const [shuffling, setShuffling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,12 +41,23 @@ export function MemberPayoutList({ circle, initialMembers, isCreator }: Props) {
         <h2 className={styles.title}>
           Payout Order <span className={styles.count}>({members.length})</span>
         </h2>
-        {isCreator && circle.status === "open" && (
+        {isCreator && circle.status === "open" && circle.payoutMethod !== "randomized" && (
           <Button variant="ghost" size="sm" onClick={handleShuffle} loading={shuffling}>
             🔀 Randomize
           </Button>
         )}
       </div>
+
+      {circle.payoutMethod === "randomized" && circle.randomizationSeed && (
+        <p style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: "0.5rem", wordBreak: "break-all" }}>
+          🔒 Order locked · Seed: <code>{circle.randomizationSeed}</code>
+        </p>
+      )}
+      {circle.payoutMethod === "randomized" && !circle.randomizationSeed && (
+        <p style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginBottom: "0.5rem" }}>
+          🎲 Order will be randomized and locked when the circle fills.
+        </p>
+      )}
 
       {error && <p className={styles.error}>{error}</p>}
 
@@ -56,23 +68,28 @@ export function MemberPayoutList({ circle, initialMembers, isCreator }: Props) {
           {members.map((m) => {
             const isCurrent = circle.status === "active" && m.position === circle.currentCycle;
             const isPast = m.hasReceivedPayout;
+            const isMe = !!currentUserId && m.userId === currentUserId;
 
             return (
               <li
                 key={m.id}
-                className={`${styles.item} ${isCurrent ? styles.current : ""} ${isPast ? styles.past : ""}`}
+                className={[
+                  styles.item,
+                  isCurrent ? styles.current : "",
+                  isPast ? styles.past : "",
+                  isMe ? styles.me : "",
+                ].join(" ")}
                 aria-current={isCurrent ? "true" : undefined}
               >
                 <span className={styles.cycle} aria-label={`Cycle ${m.position}`}>
                   {m.position}
                 </span>
 
-                <span className={styles.memberId}>
-                  <CopyableText
-                    text={m.userId}
-                    displayText={`Member ${m.userId.slice(0, 8)}…`}
-                    label="Copy member ID"
-                  />
+                <MemberAvatar displayName={m.displayName} userId={m.userId} />
+
+                <span className={styles.memberName}>
+                  {m.displayName ?? `Member ${m.userId.slice(0, 8)}…`}
+                  {isMe && <span className={styles.youBadge}>you</span>}
                 </span>
 
                 <span className={styles.statusTag}>

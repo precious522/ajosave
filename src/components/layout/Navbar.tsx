@@ -1,11 +1,20 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth";
+import { cookies } from "next/headers";
 import { authOptions } from "@/lib/auth";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { NavLink } from "./NavLink";
+import { LanguageSelector } from "./LanguageSelector";
+import { locales, defaultLocale, type Locale } from "@/i18n";
 import styles from "./Navbar.module.css";
 
 export async function Navbar() {
   const session = await getServerSession(authOptions);
   const isAdmin = (session?.user as { role?: string } | undefined)?.role === "admin";
+
+  const cookieStore = cookies();
+  const rawLocale = cookieStore.get("locale")?.value ?? defaultLocale;
+  const locale: Locale = locales.includes(rawLocale as Locale) ? (rawLocale as Locale) : defaultLocale;
 
   return (
     <header className={styles.header}>
@@ -17,8 +26,14 @@ export async function Navbar() {
         <ul className={styles.links} role="list">
           <li><Link href="/circles" className={styles.link}>Browse Circles</Link></li>
           <li><Link href="/dashboard" className={styles.link}>Dashboard</Link></li>
+          <li><Link href="/analytics" className={styles.link}>Analytics</Link></li>
           {isAdmin && <li><Link href="/admin" className={styles.link}>Admin</Link></li>}
-          <li><Link href="/auth/login" className="btn btn--primary btn--sm">Sign In</Link></li>
+          {session?.user
+            ? <li><NavLink href="/profile">Profile</NavLink></li>
+            : <li><Link href="/auth/login" className="btn btn--primary btn--sm">Sign In</Link></li>
+          }
+          <li><LanguageSelector currentLocale={locale} /></li>
+          <li><ThemeToggle /></li>
         </ul>
       </nav>
     </header>

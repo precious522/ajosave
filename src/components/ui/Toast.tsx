@@ -12,7 +12,7 @@ import styles from "./Toast.module.css";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type ToastVariant = "success" | "error" | "info";
+export type ToastVariant = "success" | "error" | "warning" | "info";
 
 interface Toast {
   id: string;
@@ -21,7 +21,7 @@ interface Toast {
 }
 
 interface ToastContextValue {
-  toast: (message: string, variant?: ToastVariant) => void;
+  toast: (_message: string, _variant?: ToastVariant) => void;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -85,7 +85,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 const ICONS: Record<ToastVariant, string> = {
   success: "✓",
   error: "✕",
+  warning: "⚠",
   info: "ℹ",
+  warning: "⚠️",
 };
 
 function ToastItem({
@@ -93,7 +95,7 @@ function ToastItem({
   onDismiss,
 }: {
   toast: Toast;
-  onDismiss: (id: string) => void;
+  onDismiss: (_id: string) => void;
 }) {
   return (
     <div

@@ -6,11 +6,10 @@
 import { horizonServer, USDC } from "@/lib/stellar";
 import { serverConfig } from "@/server/config";
 import { query } from "@/lib/db";
-import { Keypair } from "@stellar/stellar-sdk";
-import type { ServerApi } from "@stellar/stellar-sdk/lib/horizon";
+import { Keypair, Horizon } from "@stellar/stellar-sdk";
 
 interface PaymentHandler {
-  (payment: ServerApi.PaymentOperationRecord): Promise<void>;
+  (_payment: Horizon.ServerApi.PaymentOperationRecord): Promise<void>;
 }
 
 let streamCloser: (() => void) | null = null;
@@ -31,17 +30,17 @@ export async function startHorizonStream(onPayment?: PaymentHandler): Promise<vo
   console.log(`[horizon-stream] Starting payment stream for ${platformAccount}`);
 
   // Stream payments to the platform account
-  const paymentsStream = horizonServer
-    .payments()
+  const paymentsStream = (horizonServer
+    .payments() as any)
     .forAccount(platformAccount)
     .cursor("now") // Start from current ledger
     .stream({
-      onmessage: async (payment) => {
+      onmessage: async (payment: any) => {
         try {
           // Only process payment operations (not path payments or other types)
           if (payment.type !== "payment") return;
 
-          const paymentOp = payment as ServerApi.PaymentOperationRecord;
+          const paymentOp = payment as Horizon.ServerApi.PaymentOperationRecord;
 
           // Only process USDC payments
           if (
@@ -72,7 +71,7 @@ export async function startHorizonStream(onPayment?: PaymentHandler): Promise<vo
           console.error("[horizon-stream] Error processing payment:", error);
         }
       },
-      onerror: (error) => {
+      onerror: (error: any) => {
         console.error("[horizon-stream] Stream error:", error);
         // Attempt to reconnect after 5 seconds
         setTimeout(() => {
@@ -101,9 +100,7 @@ export function stopHorizonStream(): void {
  * Auto-confirm a contribution when matching USDC payment is received
  * Matches based on amount and timing
  */
-async function autoConfirmContribution(
-  payment: ServerApi.PaymentOperationRecord
-): Promise<void> {
+async function autoConfirmContribution(payment: Horizon.ServerApi.PaymentOperationRecord): Promise<void> {
   const amountUsdc = payment.amount;
   const txHash = payment.transaction_hash;
   const senderAddress = payment.from;
@@ -146,6 +143,10 @@ async function autoConfirmContribution(
      WHERE id = $2`,
     [txHash, contribution.id]
   );
+
+  // Increment user's reputation score for on-time contribution
+  const { incrementReputationOnContribution } = await import("./reputation.service");
+  await incrementReputationOnContribution(contribution.user_id);
 
   console.log(`[horizon-stream] Auto-confirmed contribution ${contribution.id}`);
 

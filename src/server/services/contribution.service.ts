@@ -2,6 +2,50 @@ import { query } from "@/lib/db";
 import { randomUUID } from "crypto";
 import type { Contribution } from "@/types";
 
+export interface ContributionRow {
+  id: string;
+  cycleNumber: number;
+  amountUsdc: string;
+  status: string;
+  createdAt: string;
+  memberName: string;
+  memberId: string;
+}
+
+export async function getContributionsByCircle(
+  circleId: string,
+  page: number = 1,
+  limit: number = 20
+): Promise<{ data: ContributionRow[]; total: number }> {
+  const offset = (page - 1) * limit;
+
+  const { rows } = await query<ContributionRow>(
+    `SELECT
+       c.id,
+       c.cycle_number      AS "cycleNumber",
+       c.amount_usdc      AS "amountUsdc",
+       c.status           AS "status",
+       c.created_at       AS "createdAt",
+       COALESCE(u.display_name, 'Unknown') AS "memberName",
+       m.id               AS "memberId"
+     FROM contributions c
+     JOIN members m ON m.id = c.member_id
+     JOIN users u ON u.id = m.user_id
+     WHERE c.circle_id = $1
+     ORDER BY c.created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [circleId, limit, offset]
+  );
+
+  const { rows: countRows } = await query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM contributions WHERE circle_id = $1`,
+    [circleId]
+  );
+
+  const total = parseInt(countRows[0]?.count ?? "0", 10);
+  return { data: rows, total };
+}
+
 /**
  * Create a pending contribution record for a member in a cycle.
  * Uses ON CONFLICT to be idempotent — safe to call multiple times.

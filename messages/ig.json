@@ -1,0 +1,54 @@
+{
+  "nav": {
+    "browseCircles": "Leba Mpaghara",
+    "dashboard": "Akwụkwọ Ọrụ",
+    "analytics": "Nyocha Ọnụ Ọgụ",
+    "admin": "Onyeisi",
+    "profile": "Profaịlụ",
+    "signIn": "Banye"
+  },
+  "home": {
+    "hero": "Ezinaụlọ Nke Edoro Edoro na Stellar",
+    "subtitle": "Sọọ ma ọ bụ mepụta mpaghara ezinaụlọ (Ajo/Esusu) enwere ume nke ihe chere. Tinye Naira, karịa USDC.",
+    "getStarted": "Bido",
+    "browseCircles": "Leba Mpaghara",
+    "poweredBy": "Ike site na Stellar & USDC",
+    "heroTitle": "Mpaghara Ajo, na-enweghị ntụkwasị obi & na-akwado",
+    "heroSubtitle": "Ụwa ọdịnala West African ezinaụlọ ọrụ edoro edoro — ugbu a nwere ume nke ihe chere Soroban. Ọ dịghị onye na-elekọta. Ọ dịghị aghụghọ. Mgbapụta USDC otomati.",
+    "startCircle": "Mepụta Mpaghara",
+    "whyAjosave": "Gịnị kpatara Ajosave?",
+    "howItWorks": "Otu a esi arụ ọrụ"
+  },
+  "circles": {
+    "title": "Leba Mpaghara",
+    "create": "Mepụta Mpaghara",
+    "join": "Sọọ",
+    "members": "ndị otu",
+    "perCycle": "kwa oge ọ bụla",
+    "open": "Mepụtara",
+    "full": "Jupụtara",
+    "active": "Na-ọrụ",
+    "completed": "Rụchara"
+  },
+  "dashboard": {
+    "title": "Akwụkwọ Ọrụ M",
+    "myCircles": "Mpaghara M",
+    "noCircles": "Ị gakwulambeghị mpaghara ọ bụla."
+  },
+  "auth": {
+    "signIn": "Banye",
+    "signOut": "Pụọ",
+    "phone": "Nọmba Ekwentị",
+    "sendOtp": "Zipu OTP",
+    "verifyOtp": "Nyocha OTP",
+    "enterOtp": "Tinyé OTP"
+  },
+  "common": {
+    "loading": "Na-akwụ...",
+    "error": "Ihe ọjọọ omere.",
+    "save": "Echekwa",
+    "cancel": "Kagbu",
+    "confirm": "Kwado",
+    "back": "Laghachi"
+  }
+}

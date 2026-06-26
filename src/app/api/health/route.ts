@@ -1,40 +1,44 @@
-import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
-import { serverConfig } from "@/server/config";
+import { NextRequest, NextResponse } from "next/server";
+import { withErrorHandler } from "@/server/middleware";
+import { getRedis } from "@/lib/redis";
+import { query, getPoolStats } from "@/lib/db";
 
-async function checkDb(): Promise<boolean> {
+export const GET = withErrorHandler(async (_req: NextRequest) => {
+  const start = Date.now();
+  const health: any = { timestamp: new Date().toISOString() };
+
+  // DB check
   try {
+    const dbStart = Date.now();
     await query("SELECT 1");
-    return true;
-  } catch {
-    return false;
+    const dbMs = Date.now() - dbStart;
+    health.db = dbMs < 500 ? "ok" : "degraded";
+    health.dbMs = dbMs;
+    const stats = getPoolStats();
+    if (stats) health.dbPool = stats;
+  } catch (err) {
+    health.db = "error";
+    health.dbError = (err as Error).message;
   }
-}
 
-async function checkRedis(): Promise<boolean> {
+  // Redis check
   try {
-    const { createClient } = await import("redis");
-    const client = createClient({ url: serverConfig.redis.url });
-    await client.connect();
-    await client.ping();
-    await client.disconnect();
-    return true;
-  } catch {
-    return false;
+    const redisStart = Date.now();
+    const redis = await getRedis();
+    // ping returns "PONG" on success
+    const pong = await (redis as any).ping();
+    const redisMs = Date.now() - redisStart;
+    health.redis = pong === "PONG" ? (redisMs < 500 ? "ok" : "degraded") : "error";
+    health.redisMs = redisMs;
+  } catch (err) {
+    health.redis = "error";
+    health.redisError = (err as Error).message;
   }
-}
 
-export async function GET() {
-  const [db, redis] = await Promise.all([checkDb(), checkRedis()]);
+  const totalMs = Date.now() - start;
+  health.status = health.db === "ok" && health.redis === "ok" ? "ok" : "degraded";
+  health.totalMs = totalMs;
 
-  const healthy = db && redis;
-  return NextResponse.json(
-    {
-      status: healthy ? "ok" : "degraded",
-      db: db ? "ok" : "error",
-      redis: redis ? "ok" : "error",
-      timestamp: new Date().toISOString(),
-    },
-    { status: healthy ? 200 : 503 }
-  );
-}
+  return NextResponse.json(health);
+});
+

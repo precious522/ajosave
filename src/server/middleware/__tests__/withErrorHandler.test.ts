@@ -3,6 +3,11 @@ jest.mock("@/lib/logger", () => ({
   default: { child: jest.fn(() => ({ info: jest.fn(), error: jest.fn() })) },
 }));
 
+jest.mock("@/lib/correlation", () => ({
+  runWithCorrelationId: jest.fn((_id: string, fn: () => unknown) => fn()),
+  getCorrelationId: jest.fn(),
+}));
+
 jest.mock("next/server", () => ({
   NextRequest: class {},
   NextResponse: {
@@ -22,7 +27,7 @@ import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { withErrorHandler } from "../index";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+
 const mockLogger = jest.requireMock("@/lib/logger").default as { child: jest.Mock };
 
 function makeReq(
@@ -48,7 +53,7 @@ beforeEach(() => {
 });
 
 describe("withErrorHandler", () => {
-  it("returns the handler response and sets x-request-id header", async () => {
+  it("returns the handler response and sets x-correlation-id header", async () => {
     const okRes = makeOkResponse();
     const handler = jest.fn().mockResolvedValue(okRes);
 
@@ -56,21 +61,34 @@ describe("withErrorHandler", () => {
 
     expect(res).toBe(okRes);
     expect((okRes.headers.set as jest.Mock)).toHaveBeenCalledWith(
-      "x-request-id",
+      "x-correlation-id",
       expect.any(String)
     );
   });
 
-  it("propagates the incoming x-request-id to the response header", async () => {
+  it("propagates the incoming x-correlation-id to the response header", async () => {
     const okRes = makeOkResponse();
     const handler = jest.fn().mockResolvedValue(okRes);
 
     await withErrorHandler(handler)(
-      makeReq({ headers: { "x-request-id": "my-trace-id" } }),
+      makeReq({ headers: { "x-correlation-id": "my-trace-id" } }),
       undefined
     );
 
-    expect((okRes.headers.set as jest.Mock)).toHaveBeenCalledWith("x-request-id", "my-trace-id");
+    expect((okRes.headers.set as jest.Mock)).toHaveBeenCalledWith("x-correlation-id", "my-trace-id");
+  });
+
+  it("falls back to x-request-id when x-correlation-id is absent", async () => {
+    const okRes = makeOkResponse();
+    await withErrorHandler(jest.fn().mockResolvedValue(okRes))(
+      makeReq({ headers: { "x-request-id": "req-id-fallback" } }),
+      undefined
+    );
+
+    expect((okRes.headers.set as jest.Mock)).toHaveBeenCalledWith(
+      "x-correlation-id",
+      "req-id-fallback"
+    );
   });
 
   it("logs method, path, statusCode, durationMs on success", async () => {
@@ -112,7 +130,7 @@ describe("withErrorHandler", () => {
     );
   });
 
-  it("captures exception in Sentry with requestId on error", async () => {
+  it("captures exception in Sentry with correlationId on error", async () => {
     const error = new Error("sentry-test");
 
     await withErrorHandler(jest.fn().mockRejectedValue(error))(makeReq(), undefined);
@@ -120,38 +138,38 @@ describe("withErrorHandler", () => {
     expect(Sentry.captureException).toHaveBeenCalledWith(
       error,
       expect.objectContaining({
-        extra: expect.objectContaining({ requestId: expect.any(String) }),
+        extra: expect.objectContaining({ correlationId: expect.any(String) }),
       })
     );
   });
 
-  it("sets x-request-id on the error response", async () => {
+  it("sets x-correlation-id on the error response", async () => {
     const res = await withErrorHandler(jest.fn().mockRejectedValue(new Error("fail")))(
-      makeReq({ headers: { "x-request-id": "err-trace" } }),
+      makeReq({ headers: { "x-correlation-id": "err-trace" } }),
       undefined
     );
 
-    expect((res.headers.set as jest.Mock)).toHaveBeenCalledWith("x-request-id", "err-trace");
+    expect((res.headers.set as jest.Mock)).toHaveBeenCalledWith("x-correlation-id", "err-trace");
   });
 
-  it("generates a UUID requestId when none is provided", async () => {
+  it("generates a UUID correlationId when none is provided", async () => {
     const okRes = makeOkResponse();
     await withErrorHandler(jest.fn().mockResolvedValue(okRes))(makeReq(), undefined);
 
     const [[, id]] = (okRes.headers.set as jest.Mock).mock.calls.filter(
-      ([k]: [string]) => k === "x-request-id"
+      ([k]: [string]) => k === "x-correlation-id"
     );
     expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   });
 
-  it("passes requestId to logger.child", async () => {
+  it("passes correlationId to logger.child", async () => {
     const okRes = makeOkResponse();
     await withErrorHandler(jest.fn().mockResolvedValue(okRes))(
-      makeReq({ headers: { "x-request-id": "trace-123" } }),
+      makeReq({ headers: { "x-correlation-id": "trace-123" } }),
       undefined
     );
 
-    expect(mockLogger.child).toHaveBeenCalledWith({ requestId: "trace-123" });
+    expect(mockLogger.child).toHaveBeenCalledWith({ correlationId: "trace-123" });
   });
 });
 

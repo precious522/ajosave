@@ -43,7 +43,7 @@ export function usdcToFiat(usdcAmount: string, currency: SupportedCurrency): num
  * @param currency - Currency code
  * @returns Multiplier (100 for most currencies)
  */
-export function getSmallestUnitMultiplier(currency: SupportedCurrency): number {
+export function getSmallestUnitMultiplier(_currency: SupportedCurrency): number {
   // All supported currencies use 100 as the smallest unit multiplier
   return 100;
 }

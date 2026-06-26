@@ -6,7 +6,7 @@ const config = {
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   testEnvironment: "jest-environment-jsdom",
   moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
-  testPathIgnorePatterns: ["<rootDir>/node_modules/", "<rootDir>/.next/"],
+  testPathIgnorePatterns: ["<rootDir>/node_modules/", "<rootDir>/.next/", "<rootDir>/e2e/"],
   collectCoverageFrom: [
     "src/**/*.{ts,tsx}",
     "!src/**/*.d.ts",
@@ -24,6 +24,24 @@ const config = {
       statements: 70,
     },
   },
+  // Integration tests require the Node environment (no DOM needed for supertest)
+  testEnvironmentOptions: {},
+  projects: [
+    {
+      displayName: "unit",
+      testEnvironment: "jest-environment-jsdom",
+      testPathPattern: "src/(?!__tests__/integration)",
+      setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
+      moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
+    },
+    {
+      displayName: "integration",
+      testEnvironment: "node",
+      testPathPattern: "src/__tests__/integration/.*\\.test\\.ts$",
+      setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
+      moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
+    },
+  ],
 };
 
 module.exports = createJestConfig(config);

@@ -42,7 +42,19 @@ Ajosave: Your contribution of 10.0000000 USDC to "Lagos Girls Monthly Ajo" (Cycl
 Ajosave: You missed your contribution of 10.0000000 USDC to "Lagos Girls Monthly Ajo". Your status is now "defaulted" and you cannot receive future payouts. Contact support if this is an error.
 ```
 
-### 5. Join Request Approved
+### 5. Contribution Reminder
+**Trigger:** Hourly cron, when `next_payout_at` is 24h or 2h away  
+**Recipients:** Active members with no confirmed contribution for the current cycle  
+**Frequency:** At most once per reminder window per cycle (idempotent via `contribution_reminders` table)  
+**Examples:**
+```
+Ajosave: Your contribution of 10.0000000 USDC to "Lagos Girls Monthly Ajo" is due in 24 hours. Please contribute now to avoid being marked as defaulted!
+```
+```
+Ajosave: Your contribution of 10.0000000 USDC to "Lagos Girls Monthly Ajo" is due in 2 hours. Please contribute now to avoid being marked as defaulted!
+```
+
+### 6. Join Request Approved
 **Trigger:** When a circle creator approves a join request (private circles only)  
 **Recipient:** The approved member  
 **Frequency:** Once per approval  
@@ -51,7 +63,7 @@ Ajosave: You missed your contribution of 10.0000000 USDC to "Lagos Girls Monthly
 Ajosave: Your join request for "Lagos Girls Monthly Ajo" has been approved! You'll be notified when the circle starts.
 ```
 
-### 6. Join Request Rejected
+### 7. Join Request Rejected
 **Trigger:** When a circle creator rejects a join request (private circles only)  
 **Recipient:** The rejected member  
 **Frequency:** Once per rejection  
@@ -95,6 +107,12 @@ Two cron endpoints handle scheduled notifications:
 - Sends reminder SMS to recipients
 - Authorization: `Bearer <CRON_SECRET>`
 
+#### `/api/cron/contribution-reminders` (Hourly)
+- Finds circles with `next_payout_at` in the 23–25h or 1–3h window
+- Sends reminder SMS to active members who haven't confirmed their contribution
+- Idempotent: uses `contribution_reminders` table to prevent duplicate sends
+- Authorization: `Bearer <CRON_SECRET>`
+
 #### `/api/cron/missed-contributions` (Daily)
 - Finds circles past their payout date
 - Identifies members who haven't contributed
@@ -110,6 +128,10 @@ Add to `vercel.json`:
   "crons": [
     {
       "path": "/api/cron/reminders",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/contribution-reminders",
       "schedule": "0 * * * *"
     },
     {
@@ -139,6 +161,10 @@ jobs:
       - name: Send Payout Reminders
         run: |
           curl -X GET https://ajosave.app/api/cron/reminders \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Send Contribution Reminders
+        run: |
+          curl -X GET https://ajosave.app/api/cron/contribution-reminders \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
   missed-contributions:

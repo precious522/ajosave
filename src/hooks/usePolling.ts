@@ -6,8 +6,8 @@ interface UsePollingOptions<T> {
   fetchFn: () => Promise<T>;
   interval?: number;
   enabled?: boolean;
-  onSuccess?: (data: T) => void;
-  onError?: (error: Error) => void;
+  onSuccess?: (_data: T) => void;
+  onError?: (_error: Error) => void;
 }
 
 export function usePolling<T>({

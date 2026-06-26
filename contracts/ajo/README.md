@@ -98,7 +98,9 @@ Sets up the circle. Stores all parameters and emits an `initialized` event.
 - Sends `contribution_amount × max_members` to the member at position `current_cycle - 1` (0-indexed).
 - Advances to the next cycle or marks the circle completed.
 
-### `get_state(env) → (current_cycle, max_members, next_payout_time, completed)`
+### `get_state(env) → (current_cycle, max_members, next_payout_time, completed, paused)`
+
+`paused` is `true` when the admin has emergency-paused the contract.
 
 Read-only. Returns the four key state values.
 
@@ -114,38 +116,77 @@ Read-only. Returns all member addresses in join order.
 
 ---
 
-## Storage Layout
+## Storage
 
-All state is stored in **instance storage** (persists for the contract's lifetime).
+### Storage Classification
 
-| Key                              | Type              | Description                                      |
-|----------------------------------|-------------------|--------------------------------------------------|
-| `DataKey::Admin`                 | `Address`         | Admin address                                    |
-| `DataKey::Token`                 | `Address`         | USDC token contract                              |
-| `DataKey::ContributionAmount`    | `i128`            | Per-member per-cycle amount (stroops)            |
-| `DataKey::MaxMembers`            | `u32`             | Total members / cycles                           |
-| `DataKey::CycleIntervalSecs`     | `u64`             | Seconds between payouts                          |
-| `DataKey::Members`               | `Vec<Address>`    | Members in join order                            |
-| `DataKey::CurrentCycle`          | `u32`             | 0 = not started; 1..N = active cycle             |
-| `DataKey::NextPayoutTime`        | `u64`             | Ledger timestamp after which payout is allowed   |
-| `DataKey::Contributions(addr,n)` | `bool`            | Whether `addr` has contributed for cycle `n`     |
-| `DataKey::Completed`             | `bool`            | True after the final payout                      |
+The contract uses three storage types to optimize ledger fees:
+
+| Type | Keys | Lifetime | Purpose |
+|------|------|----------|---------|
+| Instance | Admin, Token, ContributionAmount, MaxMembers, CycleIntervalSecs, Members, PayoutOrder, CurrentCycle, NextPayoutTime, Completed, Paused, PayoutLock | Contract lifetime | Core circle configuration |
+| Temporary | Contributions(Address, u32) | Auto-expire (~3.5 days) | Per-cycle contribution tracking |
+| Persistent | MemberReputation, TotalCirclesCompleted, OnTimeContributions, TotalContributions | 30 days | Member reputation (survives upgrades) |
+
+### Optimization Benefits
+
+- **Temporary storage** for contributions reduces ledger fees by ~35-40% compared to instance storage
+- **Automatic TTL expiration** cleans up contribution entries after circle completion
+- **Persistent storage** for reputation ensures cross-contract state survival
+
+For detailed benchmarks, see [BENCHMARKS.md](./BENCHMARKS.md).
 
 ---
 
 ## Events
 
-Events are published via `env.events().publish(topic, data)`.
+Events are published via `env.events().publish(topic, data)` and can be consumed by the backend indexer for auditing and notifications.
 
-| Topic symbol   | Data                                          | Emitted by      |
-|----------------|-----------------------------------------------|-----------------|
-| `initialized`  | `(admin, max_members, contribution_amount)`   | `initialize`    |
-| `joined`       | `(member,)`                                   | `join`          |
-| `started`      | `(max_members,)`                              | `join` (last)   |
-| `contributed`  | `(member, cycle_number)`                      | `contribute`    |
-| `payout`       | `(recipient, amount, cycle_number)`           | `payout`        |
-| `completed`    | `()`                                          | `payout` (last) |
-| `upgraded`     | `(new_wasm_hash,)`                            | `upgrade`       |
+| Topic symbol       | Data                                                    | Emitted by      | Description |
+|--------------------|---------------------------------------------------------|-----------------|-------------|
+| `initialized`      | `(admin, max_members, contribution_amount)`                | `initialize`    | Circle created with parameters |
+| `member_joined`    | `(member, contribution_amount)`                          | `join`          | Member joined and locked contribution |
+| `circle_started`   | `(max_members, contribution_amount)`                     | `join` (last)   | Circle activated when full |
+| `contribution_made`| `(member, amount, cycle_number)`                         | `contribute`    | Member contributed for cycle |
+| `payout_sent`      | `(recipient, amount, cycle_number)`                      | `payout`        | Payout distributed to recipient |
+| `circle_completed` | `()`                                                    | `payout` (last) | Circle finished all cycles |
+| `member_defaulted` | `(member, cycle_number)`                                 | `payout`        | Member missed contribution for cycle |
+| `upgraded`         | `(new_wasm_hash,)`                                        | `upgrade`       | Contract WASM upgraded |
+| `migrated`         | `(from_version, to_version)`                              | `migrate`       | Storage migration completed |
+| `paused`           | `()`                                                    | `pause`         | Emergency pause activated |
+| `unpaused`         | `()`                                                    | `unpause`       | Emergency pause lifted |
+| `admin_proposed`   | `(old_admin, new_admin)`                                  | `propose_admin` | Admin transfer proposed |
+| `admin_transferred`| `(old_admin, new_admin)`                                  | `accept_admin`  | Admin role transferred |
+| `reputation_updated`| `(member, score)`                                       | internal        | Member reputation recalculated |
+
+### Event Schema
+
+All events follow Soroban's standard event format:
+
+```typescript
+// Events can be fetched via Soroban RPC
+type ContractEvent = {
+  topic: string[];     // Event symbol as first element
+  value: any;          // Event data
+  ledger: number;      // Ledger sequence
+  timestamp: number;   // Unix timestamp
+}
+
+// Backend indexer example (pseudo-code)
+// GET /events?start_ledger=123456&filter=contract_id:<CONTRACT_ID>
+```
+
+### Consuming Events in Backend
+
+The backend can query events using Soroban RPC:
+
+```typescript
+// Example: Fetch events for a contract
+const events = await sorobanRpc.getEvents({
+  startLedger: fromLedger,
+  contractId: process.env.STELLAR_AJO_CONTRACT_ID
+});
+```
 
 ---
 

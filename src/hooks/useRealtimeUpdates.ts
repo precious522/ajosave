@@ -9,10 +9,11 @@ import type { WebSocketEvents } from "@/server/websocket";
 interface UseRealtimeUpdatesOptions {
   circleId?: string;
   userId?: string;
-  onContributionConfirmed?: (data: WebSocketEvents["contribution:confirmed"]) => void;
-  onPayoutProcessed?: (data: WebSocketEvents["payout:processed"]) => void;
-  onCircleCompleted?: (data: WebSocketEvents["circle:completed"]) => void;
-  onCircleStarted?: (data: WebSocketEvents["circle:started"]) => void;
+  onContributionConfirmed?: (_data: WebSocketEvents["contribution:confirmed"]) => void;
+  onPayoutProcessed?: (_data: WebSocketEvents["payout:processed"]) => void;
+  onCircleCompleted?: (_data: WebSocketEvents["circle:completed"]) => void;
+  onCircleStarted?: (_data: WebSocketEvents["circle:started"]) => void;
+  onChatMessage?: (_data: WebSocketEvents["chat:message"]) => void;
 }
 
 export function useRealtimeUpdates(options: UseRealtimeUpdatesOptions) {
@@ -23,6 +24,7 @@ export function useRealtimeUpdates(options: UseRealtimeUpdatesOptions) {
     onPayoutProcessed,
     onCircleCompleted,
     onCircleStarted,
+    onChatMessage,
   } = options;
 
   const socketRef = useRef<Socket | null>(null);
@@ -84,6 +86,10 @@ export function useRealtimeUpdates(options: UseRealtimeUpdatesOptions) {
       socket.on("circle:started", onCircleStarted);
     }
 
+    if (onChatMessage) {
+      socket.on("chat:message", onChatMessage);
+    }
+
     // Cleanup on unmount
     return () => {
       if (circleId) {
@@ -98,6 +104,7 @@ export function useRealtimeUpdates(options: UseRealtimeUpdatesOptions) {
     onPayoutProcessed,
     onCircleCompleted,
     onCircleStarted,
+    onChatMessage,
   ]);
 
   return {

@@ -4,10 +4,18 @@ info:
   description: |
     Trustless rotating savings circles (Ajo/Esusu) on the Stellar blockchain.
 
+    ## API Versioning
+    This API uses URL-based versioning. All endpoints are prefixed with `/api/v1/`.
+    
+    **Current version:** v1  
+    **Base URL:** `/api/v1/`
+
+    Legacy endpoints without version prefix (`/api/`) are deprecated and redirect to v1.
+
     ## Authentication
     Most endpoints require a valid session cookie obtained via the OTP login flow:
-    1. `POST /api/auth/send-otp` – request a 6-digit OTP to your phone
-    2. `POST /api/auth/verify-otp` – exchange OTP for a session cookie (NextAuth)
+    1. `POST /api/v1/auth/send-otp` – request a 6-digit OTP to your phone
+    2. `POST /api/v1/auth/verify-otp` – exchange OTP for a session cookie (NextAuth)
 
     The session cookie is automatically sent by the browser on subsequent requests.
     Server-to-server callers must include the `Cookie` header.
@@ -21,9 +29,9 @@ info:
     url: https://opensource.org/licenses/MIT
 
 servers:
-  - url: https://www.ajosave.app
+  - url: https://www.ajosave.app/api/v1
     description: Production
-  - url: http://localhost:3000
+  - url: http://localhost:3000/api/v1
     description: Local development
 
 tags:
@@ -78,7 +86,7 @@ components:
     # ── Domain objects ──────────────────────────────────────────────────────────
     Circle:
       type: object
-      required: [id, name, creatorId, contributionUsdc, contributionNgn, maxMembers, cycleFrequency, status, currentCycle, createdAt, updatedAt]
+      required: [id, name, creatorId, contributionUsdc, contributionFiat, contributionCurrency, circleType, maxMembers, cycleFrequency, status, currentCycle, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -93,10 +101,18 @@ components:
           type: string
           description: Per-member per-cycle amount in USDC (7 decimal places)
           example: "10.0000000"
-        contributionNgn:
+        contributionFiat:
           type: integer
-          description: Equivalent NGN amount collected via Paystack
+          description: Equivalent fiat amount collected via Paystack/Stripe
           example: 16000
+        contributionCurrency:
+          type: string
+          enum: [NGN, GBP, USD, EUR]
+          example: NGN
+        circleType:
+          type: string
+          enum: [public, private]
+          example: public
         maxMembers:
           type: integer
           minimum: 2
@@ -223,7 +239,7 @@ components:
 # ─── Paths ─────────────────────────────────────────────────────────────────────
 paths:
   # ── Auth ────────────────────────────────────────────────────────────────────
-  /api/auth/send-otp:
+  /auth/send-otp:
     post:
       tags: [auth]
       summary: Request a phone OTP
@@ -268,7 +284,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/auth/logout:
+  /auth/logout:
     post:
       tags: [auth]
       summary: Sign out
@@ -280,7 +296,7 @@ paths:
           description: Signed out successfully
 
   # ── Circles ─────────────────────────────────────────────────────────────────
-  /api/circles:
+  /circles:
     get:
       tags: [circles]
       summary: List circles
@@ -327,19 +343,24 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, contributionNgn, maxMembers, cycleFrequency]
+              required: [name, contributionFiat, contributionCurrency, maxMembers, cycleFrequency]
               properties:
                 name:
                   type: string
                   minLength: 3
                   maxLength: 60
                   example: "Lagos Diaspora Circle"
-                contributionNgn:
+                contributionFiat:
                   type: integer
                   minimum: 1000
                   maximum: 5000000
-                  description: Per-member per-cycle amount in NGN
+                  description: Per-member per-cycle amount in fiat
                   example: 16000
+                contributionCurrency:
+                  type: string
+                  enum: [NGN, GBP, USD, EUR]
+                  description: Currency for the fiat amount
+                  example: NGN
                 maxMembers:
                   type: integer
                   minimum: 2
@@ -371,7 +392,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/circles/{id}:
+  /circles/{id}:
     get:
       tags: [circles]
       summary: Get circle details
@@ -406,7 +427,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/circles/{id}/join:
+  /circles/{id}/join:
     post:
       tags: [circles]
       summary: Join a circle
@@ -456,7 +477,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/circles/{id}/contribute:
+  /circles/{id}/contribute:
     post:
       tags: [circles]
       summary: Initiate a contribution payment
@@ -514,7 +535,7 @@ paths:
           $ref: "#/components/responses/InternalError"
 
   # ── Cron ────────────────────────────────────────────────────────────────────
-  /api/cron/cycle:
+  /cron/cycle:
     get:
       tags: [cron]
       summary: Trigger cycle payout check
@@ -545,7 +566,7 @@ paths:
           $ref: "#/components/responses/Unauthorized"
 
   # ── Health ──────────────────────────────────────────────────────────────────
-  /api/health:
+  /health:
     get:
       tags: [health]
       summary: Health check
