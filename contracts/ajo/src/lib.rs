@@ -208,6 +208,7 @@ impl AjoContract {
             panic!("already contributed this cycle");
         }
 
+        // Cache token and amount in locals — avoids two extra storage reads
         let token: Address = env.storage().instance().get(&DataKey::Token).expect("not initialized");
         let token_client = token::Client::new(&env, &token);
         token_client.transfer(&member, &env.current_contract_address(), &amount);
@@ -306,6 +307,7 @@ impl AjoContract {
             panic!("payout time not reached");
         }
 
+        // Cache all remaining reads into locals — avoids repeated storage lookups below
         let members: Vec<Address> = env.storage().instance().get(&DataKey::Members).expect("not initialized");
         let max_members: u32 = env.storage().instance().get(&DataKey::MaxMembers).expect("not initialized");
         let token: Address = env.storage().instance().get(&DataKey::Token).expect("not initialized");
