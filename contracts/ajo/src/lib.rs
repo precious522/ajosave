@@ -54,7 +54,7 @@ impl AjoContract {
         cycle_interval_secs: u64,
     ) {
         if env.storage().instance().has(&DataKey::Admin) {
-            panic!("already initialized");
+            panic!("AlreadyInitialized");
         }
         if max_members < 2 || max_members > 20 {
             panic!("max_members must be between 2 and 20");
@@ -298,6 +298,16 @@ mod tests {
 
         let (_, _, _, completed) = client.get_state();
         assert!(completed);
+    }
+
+    #[test]
+    #[should_panic(expected = "AlreadyInitialized")]
+    fn test_double_initialize_panics() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (admin, _, token_id, _, client) = setup(&env);
+        // Second call must be rejected
+        client.initialize(&admin, &token_id, &100_000_000, &3, &86400);
     }
 
     #[test]
