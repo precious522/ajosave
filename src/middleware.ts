@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 
 export function middleware(request: NextRequest) {
   const origin = request.headers.get("origin");
+  const nonce = randomBytes(16).toString("base64");
+  const csp = buildCsp(nonce);
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
 
   const configuredOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(",")
@@ -81,9 +87,16 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set("Content-Security-Policy-Report-Only", csp);
+
+  return response;
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  matcher: [
+    "/api/:path*",
+    // Apply CSP to all page routes (exclude static files and _next internals)
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
 };
