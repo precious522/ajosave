@@ -1,0 +1,102 @@
+name: Staging Deploy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+concurrency:
+  group: staging-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    name: Deploy Preview
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_APP_URL: ${{ vars.STAGING_URL }}
+          NEXT_PUBLIC_APP_NAME: Ajosave
+          NEXTAUTH_URL: ${{ vars.STAGING_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          STELLAR_NETWORK: testnet
+          STELLAR_HORIZON_URL: https://horizon-testnet.stellar.org
+          STELLAR_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
+          STELLAR_AJO_CONTRACT_ID: ${{ secrets.STELLAR_AJO_CONTRACT_ID }}
+          STELLAR_SERVER_SECRET_KEY: ${{ secrets.STELLAR_TESTNET_SECRET_KEY }}
+          USDC_ISSUER: ${{ vars.USDC_ISSUER }}
+          USDC_ASSET_CODE: USDC
+          PAYSTACK_SECRET_KEY: ${{ secrets.PAYSTACK_SECRET_KEY }}
+          TERMII_API_KEY: ${{ secrets.TERMII_API_KEY }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          NEXT_PUBLIC_SENTRY_DSN: ""
+          SENTRY_DSN: ""
+          SENTRY_ORG: ajosave
+          SENTRY_PROJECT: ajosave-nextjs
+
+      - name: Deploy to Vercel (preview)
+        id: deploy
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-comment: false
+
+      - name: Post preview URL as PR comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ## 🚀 Staging Preview Deployed
+
+            | | |
+            |---|---|
+            | **Preview URL** | ${{ steps.deploy.outputs.preview-url }} |
+            | **Branch** | `${{ github.head_ref }}` |
+            | **Commit** | `${{ github.sha }}` |
+
+            > Uses staging database. Torn down automatically on PR close.
+          comment-author: github-actions[bot]
+          edit-mode: replace
+          body-includes: "🚀 Staging Preview Deployed"
+
+  teardown:
+    name: Teardown Preview
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+    steps:
+      - name: Delete Vercel deployment
+        run: |
+          DEPLOYMENTS=$(curl -s \
+            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+            "https://api.vercel.com/v6/deployments?projectId=${{ secrets.VERCEL_PROJECT_ID }}&teamId=${{ secrets.VERCEL_ORG_ID }}&meta-githubPrId=${{ github.event.pull_request.number }}" \
+            | jq -r '.deployments[].uid')
+          for uid in $DEPLOYMENTS; do
+            curl -s -X DELETE \
+              -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+              "https://api.vercel.com/v13/deployments/$uid?teamId=${{ secrets.VERCEL_ORG_ID }}"
+            echo "Deleted deployment: $uid"
+          done
+
+      - name: Post teardown comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: "🗑️ Staging preview environment torn down."
+          comment-author: github-actions[bot]
+          edit-mode: replace
+          body-includes: "🚀 Staging Preview Deployed"
